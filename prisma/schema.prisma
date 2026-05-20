@@ -6,3 +6,59 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String
+  image     String?
+  createdAt DateTime @default(now())
+
+  products Product[]
+}
+
+model Product {
+  id                String      @id @default(cuid())
+
+  name              String
+
+  brand             String?
+
+  purchaseDate      DateTime
+
+  warrantyExpiry    DateTime
+
+  invoiceImage      String?
+
+  createdAt         DateTime    @default(now())
+
+  userId            String
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  warranty          Warranty?
+
+  documents         Document[]
+}
+
+model Warranty {
+  id                 String   @id @default(cuid())
+  expiryDate         DateTime
+  warrantyDuration   Int
+  warrantyType       String?
+  extensionAvailable Boolean  @default(false)
+
+  productId String  @unique
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  fileUrl    String
+  fileType   String
+  uploadedAt DateTime @default(now())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
