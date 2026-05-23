@@ -25,9 +25,12 @@ model Product {
 
   brand             String?
 
-  purchaseDate      DateTime
+  serialNumber      String?
 
-  warrantyExpiry    DateTime
+
+  purchaseDate      DateTime?
+
+  warrantyExpiry    DateTime?
 
   invoiceImage      String?
 
@@ -54,11 +57,17 @@ model Warranty {
 }
 
 model Document {
-  id         String   @id @default(cuid())
-  fileUrl    String
-  fileType   String
-  uploadedAt DateTime @default(now())
+  id          String   @id @default(cuid())
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fileUrl     String
+
+  fileType    String
+
+  documentType String
+
+  uploadedAt  DateTime @default(now())
+
+  productId   String
+
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

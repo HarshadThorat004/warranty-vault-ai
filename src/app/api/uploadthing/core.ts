@@ -1,23 +1,19 @@
-import { createUploadthing } from "uploadthing/next";
+import { createUploadthing, type FileRouter } from "uploadthing/next";
 
 const f = createUploadthing();
 
 export const ourFileRouter = {
   imageUploader: f({
     image: {
-      maxFileSize: "4MB",
+      maxFileSize: "8MB",
       maxFileCount: 1,
     },
   }).onUploadComplete(async ({ file }) => {
-    console.log("UPLOAD COMPLETE");
-
-    console.log(file.url);
-
     return {
-      url: file.url,
+      url: file.ufsUrl
     };
   }),
-};
+} satisfies FileRouter;
 
 export type OurFileRouter =
   typeof ourFileRouter;

@@ -6,7 +6,16 @@ import { useRouter } from "next/navigation";
 
 import Image from "next/image";
 
+import { toast } from "sonner";
+
 import UploadButtonComponent from "@/components/upload-button";
+
+type DocumentType = {
+  id?: string;
+  fileUrl: string;
+  fileType: string;
+  documentType: string;
+};
 
 type Product = {
   id: string;
@@ -15,6 +24,8 @@ type Product = {
   purchaseDate: string;
   warrantyExpiry: string;
   invoiceImage: string | null;
+
+  documents?: DocumentType[];
 };
 
 type Props = {
@@ -29,9 +40,9 @@ export default function EditProductForm({
   const [loading, setLoading] =
     useState(false);
 
-  const [imageUrl, setImageUrl] =
-    useState(
-      product.invoiceImage || ""
+  const [documents, setDocuments] =
+    useState<DocumentType[]>(
+      product.documents || []
     );
 
   async function handleSubmit(
@@ -47,14 +58,16 @@ export default function EditProductForm({
 
     const body = {
       name: formData.get("name"),
+
       brand: formData.get("brand"),
+
       purchaseDate:
         formData.get("purchaseDate"),
 
       warrantyExpiry:
         formData.get("warrantyExpiry"),
 
-      invoiceImage: imageUrl,
+      documents,
     };
 
     const response = await fetch(
@@ -74,20 +87,40 @@ export default function EditProductForm({
     setLoading(false);
 
     if (response.ok) {
+      toast.success(
+        "Product updated successfully"
+      );
+
       router.push(
         `/dashboard/products/${product.id}`
       );
 
       router.refresh();
     } else {
-      alert("Something went wrong");
+      toast.error(
+        "Something went wrong"
+      );
     }
+  }
+
+  function removeDocument(
+    index: number
+  ) {
+    setDocuments((prev) =>
+      prev.filter(
+        (_, i) => i !== index
+      )
+    );
+
+    toast.success(
+      "Document removed"
+    );
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-5"
+      className="space-y-6"
     >
       <div>
         <label className="mb-2 block text-sm text-gray-400">
@@ -99,7 +132,7 @@ export default function EditProductForm({
           name="name"
           required
           defaultValue={product.name}
-          className="w-full rounded-lg border border-gray-700 bg-black p-3 outline-none"
+          className="w-full rounded-xl border border-gray-700 bg-black p-3 outline-none transition focus:border-white"
         />
       </div>
 
@@ -114,7 +147,7 @@ export default function EditProductForm({
           defaultValue={
             product.brand || ""
           }
-          className="w-full rounded-lg border border-gray-700 bg-black p-3 outline-none"
+          className="w-full rounded-xl border border-gray-700 bg-black p-3 outline-none transition focus:border-white"
         />
       </div>
 
@@ -130,7 +163,7 @@ export default function EditProductForm({
           defaultValue={
             product.purchaseDate
           }
-          className="w-full rounded-lg border border-gray-700 bg-black p-3 outline-none"
+          className="w-full rounded-xl border border-gray-700 bg-black p-3 outline-none transition focus:border-white"
         />
       </div>
 
@@ -146,40 +179,137 @@ export default function EditProductForm({
           defaultValue={
             product.warrantyExpiry
           }
-          className="w-full rounded-lg border border-gray-700 bg-black p-3 outline-none"
+          className="w-full rounded-xl border border-gray-700 bg-black p-3 outline-none transition focus:border-white"
         />
       </div>
 
-      <div>
-        <label className="mb-3 block text-sm text-gray-400">
-          Upload Invoice
-        </label>
-
-        <UploadButtonComponent
-          onChange={(url) => {
-            if (url) {
-              setImageUrl(url);
-            }
-          }}
-        />
-      </div>
-
-      {imageUrl && (
+      <div className="space-y-5">
         <div>
-          <Image
-            src={imageUrl}
-            alt="Invoice"
-            width={800}
-            height={500}
-            className="rounded-xl border border-gray-700"
+          <p className="mb-3 text-sm text-gray-400">
+            Upload Invoice
+          </p>
+
+          <UploadButtonComponent
+            onChange={(url) => {
+              if (url) {
+                setDocuments((prev) => [
+                  ...prev,
+                  {
+                    fileUrl: url,
+                    fileType: "image",
+                    documentType:
+                      "Invoice",
+                  },
+                ]);
+
+                toast.success(
+                  "Invoice uploaded"
+                );
+              }
+            }}
           />
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm text-gray-400">
+            Upload Warranty Card
+          </p>
+
+          <UploadButtonComponent
+            onChange={(url) => {
+              if (url) {
+                setDocuments((prev) => [
+                  ...prev,
+                  {
+                    fileUrl: url,
+                    fileType: "image",
+                    documentType:
+                      "Warranty Card",
+                  },
+                ]);
+
+                toast.success(
+                  "Warranty card uploaded"
+                );
+              }
+            }}
+          />
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm text-gray-400">
+            Upload Other Documents
+          </p>
+
+          <UploadButtonComponent
+            onChange={(url) => {
+              if (url) {
+                setDocuments((prev) => [
+                  ...prev,
+                  {
+                    fileUrl: url,
+                    fileType: "image",
+                    documentType:
+                      "Other",
+                  },
+                ]);
+
+                toast.success(
+                  "Document uploaded"
+                );
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      {documents.length > 0 && (
+        <div className="grid gap-5">
+          {documents.map(
+            (doc, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-2xl border border-gray-700 bg-black"
+              >
+                <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
+                  <p className="text-sm text-gray-300">
+                    {
+                      doc.documentType
+                    }
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeDocument(
+                        index
+                      )
+                    }
+                    className="text-sm text-red-400 transition hover:text-red-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <Image
+                  src={doc.fileUrl}
+                  alt={
+                    doc.documentType
+                  }
+                  width={800}
+                  height={500}
+                  className="h-auto w-full object-cover"
+                />
+              </div>
+            )
+          )}
         </div>
       )}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-white py-3 font-semibold text-black"
+        className="w-full rounded-xl bg-white py-3 font-semibold text-black transition hover:bg-gray-200 disabled:opacity-50"
       >
         {loading
           ? "Saving..."

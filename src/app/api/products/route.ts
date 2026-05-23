@@ -6,11 +6,14 @@ import { authOptions } from "@/lib/auth";
 
 import { prisma } from "@/lib/prisma";
 
-export async function POST(req: Request) {
+export async function POST(
+  req: Request
+) {
   try {
-    const session = await getServerSession(
-      authOptions
-    );
+    const session =
+      await getServerSession(
+        authOptions
+      );
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
       brand,
       purchaseDate,
       warrantyExpiry,
-      invoiceImage,
+      documents,
     } = body;
 
     if (
@@ -40,7 +43,8 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json(
         {
-          error: "Missing required fields",
+          error:
+            "Missing required fields",
         },
         {
           status: 400,
@@ -48,16 +52,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: {
-        email: session.user.email,
-      },
-    });
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          email:
+            session.user.email,
+        },
+      });
 
     if (!user) {
       return NextResponse.json(
         {
-          error: "User not found",
+          error:
+            "User not found",
         },
         {
           status: 404,
@@ -70,22 +77,53 @@ export async function POST(req: Request) {
         data: {
           name,
 
-          brand: brand || null,
+          brand:
+            brand || null,
 
-          purchaseDate: new Date(
-            purchaseDate
-          ),
+          purchaseDate:
+            new Date(
+              purchaseDate
+            ),
 
-          warrantyExpiry: new Date(
-            warrantyExpiry
-          ),
-
-          invoiceImage:
-            invoiceImage || null,
+          warrantyExpiry:
+            new Date(
+              warrantyExpiry
+            ),
 
           userId: user.id,
         },
       });
+
+    if (
+      documents &&
+      documents.length > 0
+    ) {
+      await prisma.document.createMany(
+        {
+          data: documents.map(
+            (
+              doc: {
+                fileUrl: string;
+                fileType: string;
+                documentType: string;
+              }
+            ) => ({
+              fileUrl:
+                doc.fileUrl,
+
+              fileType:
+                doc.fileType,
+
+              documentType:
+                doc.documentType,
+
+              productId:
+                product.id,
+            })
+          ),
+        }
+      );
+    }
 
     return NextResponse.json(
       product,
@@ -101,7 +139,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        error: "Something went wrong",
+        error:
+          "Something went wrong",
       },
       {
         status: 500,

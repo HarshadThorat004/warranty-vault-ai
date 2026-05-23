@@ -1,21 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+
+import { Inter } from "next/font/google";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import { Toaster } from "sonner";
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "WarrantyVault AI",
-  description: "AI-powered warranty management platform",
+  title: "Warranty Vault AI",
+  description:
+    "Track your product warranties easily",
 };
 
 export default function RootLayout({
@@ -24,11 +22,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable}`}
-    >
-      <body>{children}</body>
+    <html lang="en">
+      <body
+        className={`${inter.className} bg-black text-white`}
+      >
+        {children}
+
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={3000}
+          theme="dark"
+        />
+      </body>
     </html>
   );
 }

@@ -1,36 +1,154 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Warranty Vault AI
 
-## Getting Started
+AI-powered warranty and product management platform built with Next.js 16, Prisma, PostgreSQL, UploadThing, and Tailwind CSS.
 
-First, run the development server:
+Track warranties, upload invoices, manage product documents, and monitor expiry dates from a modern dashboard.
+
+---
+
+# Features
+
+- Product management dashboard
+- Add / Edit / Delete products
+- Warranty tracking system
+- Warranty expiry alerts
+- Document uploads
+- Invoice & warranty document storage
+- Product detail pages
+- Warranty usage progress tracking
+- Authentication system
+- Responsive UI
+- REST API architecture
+- Prisma ORM integration
+
+---
+
+# Tech Stack
+
+## Frontend
+- Next.js 16
+- React
+- TypeScript
+- Tailwind CSS
+- Sonner Toasts
+
+## Backend
+- Next.js Route Handlers
+- Prisma ORM
+- PostgreSQL
+
+## Authentication
+- NextAuth.js
+
+## File Uploads
+- UploadThing
+
+## AI (Planned)
+- Gemini OCR invoice scanning
+
+---
+
+# Folder Structure
+
+```bash
+src/
+ ├── app/
+ │   ├── api/
+ │   ├── dashboard/
+ │   └── auth/
+ │
+ ├── components/
+ │
+ ├── lib/
+ │
+ └── prisma/
+```
+
+---
+
+# Installation
+
+```bash
+git clone <repo-url>
+
+cd warranty-vault-ai
+
+npm install
+```
+---
+
+# Prisma Setup
+
+```bash
+npx prisma generate
+
+npx prisma db push
+```
+
+---
+
+# Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+# API Routes
 
-To learn more about Next.js, take a look at the following resources:
+## Products
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Method | Route |
+|--------|-------|
+| GET | /api/products/[id] |
+| POST | /api/products |
+| PUT | /api/products/[id] |
+| DELETE | /api/products/[id] |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+# Production Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- App Router architecture
+- Dynamic route handling
+- Error boundaries
+- Loading skeletons
+- Responsive UI
+- Prisma ORM integration
+- PostgreSQL database
+- Authentication system
+- File upload support
+- Warranty analytics 
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Future Improvements
+
+- AI OCR invoice scanning
+- Email warranty reminders
+- PDF preview support
+- Analytics dashboard
+- Multi-user organization support
+- Cloud storage optimization
+- Export reports
+
+---
+
+# Screenshots
+
+## Dashboard
+<img width="100%" alt="Dashboard Screenshot" src="YOUR_SCREENSHOT_URL" />
+
+## Product Details
+<img width="100%" alt="Product Page Screenshot" src="YOUR_SCREENSHOT_URL" />.
+
+---
+
+# Author
+
+Built by Harshad Thorat

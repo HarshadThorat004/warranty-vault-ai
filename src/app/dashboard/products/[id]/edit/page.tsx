@@ -16,11 +16,15 @@ export default async function EditPage({
   const { id } = await params;
 
   const product =
-    await prisma.product.findUnique({
-      where: {
-        id,
-      },
-    });
+  await prisma.product.findUnique({
+    where: {
+      id,
+    },
+
+    include: {
+      documents: true,
+    },
+  });
 
   if (!product) {
     return notFound();
@@ -39,14 +43,15 @@ export default async function EditPage({
 
             purchaseDate:
               product.purchaseDate
-                .toISOString()
-                .split("T")[0],
+                ?.toISOString()
+                .split("T")[0] || "",
 
             warrantyExpiry:
               product.warrantyExpiry
-                .toISOString()
-                .split("T")[0],
+                ?.toISOString()
+                .split("T")[0] || "",
           }}
+        
         />
       </div>
     </main>
