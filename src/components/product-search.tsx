@@ -1,308 +1,210 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
 import Link from "next/link";
-
 import Image from "next/image";
+import { Package, Search, ArrowUpRight } from "lucide-react";
 
-type Product = {
-  id: string;
-  name: string;
-  brand: string | null;
-  purchaseDate: Date;
-  warrantyExpiry: Date;
-  createdAt: Date;
-  invoiceImage: string | null;
-  userId: string;
-};
+import type { Product } from "@/types/product";
+import {
+  getDaysRemaining,
+  getProductThumbnail,
+  isExpired,
+  isExpiringSoon,
+} from "@/lib/warranty";
 
 type Props = {
   products: Product[];
 };
 
-type FilterType =
-  | "all"
-  | "active"
-  | "expiring"
-  | "expired";
+type FilterType = "all" | "active" | "expiring" | "expired";
 
-export default function ProductSearch({
-  products,
-}: Props) {
-  const [search, setSearch] =
-    useState("");
+export default function ProductSearch({ products }: Props) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<FilterType>("all");
 
-  const [filter, setFilter] =
-    useState<FilterType>("all");
+  const filteredProducts = useMemo(() => {
+    const list = products.filter((product) => {
+      const searchText = search.toLowerCase();
+      const matchesSearch =
+        product.name.toLowerCase().includes(searchText) ||
+        (product.brand ?? "").toLowerCase().includes(searchText);
 
-  const filteredProducts =
-    useMemo(() => {
-      return products.filter(
-        (product) => {
-          const searchText =
-            search.toLowerCase();
+      if (!product.warrantyExpiry) {
+        return filter === "all" ? matchesSearch : false;
+      }
 
-          const matchesSearch =
-            product.name
-              .toLowerCase()
-              .includes(searchText) ||
-            product.brand
-              ?.toLowerCase()
-              .includes(searchText);
+      const expired = isExpired(product.warrantyExpiry);
+      const expiring = isExpiringSoon(product.warrantyExpiry);
 
-          const today =
-            new Date();
+      if (filter === "active") return matchesSearch && !expired;
+      if (filter === "expiring") return matchesSearch && expiring;
+      if (filter === "expired") return matchesSearch && expired;
+      return matchesSearch;
+    });
 
-          const expiryDate =
-            new Date(
-              product.warrantyExpiry
-            );
-
-          const timeDifference =
-            expiryDate.getTime() -
-            today.getTime();
-
-          const daysRemaining =
-            Math.ceil(
-              timeDifference /
-                (1000 *
-                  60 *
-                  60 *
-                  24)
-            );
-
-          const isExpired =
-            daysRemaining < 0;
-
-          const isExpiringSoon =
-            daysRemaining <=
-              30 &&
-            daysRemaining >= 0;
-
-          if (filter === "active") {
-            return (
-              matchesSearch &&
-              !isExpired
-            );
-          }
-
-          if (
-            filter === "expiring"
-          ) {
-            return (
-              matchesSearch &&
-              isExpiringSoon
-            );
-          }
-
-          if (filter === "expired") {
-            return (
-              matchesSearch &&
-              isExpired
-            );
-          }
-
-          return matchesSearch;
-        }
+    return list.sort((a, b) => {
+      if (!a.warrantyExpiry) return 1;
+      if (!b.warrantyExpiry) return -1;
+      return (
+        getDaysRemaining(a.warrantyExpiry) - getDaysRemaining(b.warrantyExpiry)
       );
-    }, [products, search, filter]);
+    });
+  }, [products, search, filter]);
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) =>
-            setSearch(
-              e.target.value
-            )
-          }
-          className="w-full rounded-xl border border-gray-700 bg-neutral-900 p-4 text-white outline-none transition focus:border-white md:max-w-md"
-        />
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full md:max-w-sm">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500"
+          />
+          <input
+            type="text"
+            placeholder="Search by name or brand…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search products"
+            className="w-full rounded-xl border border-white/10 bg-black/40 py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-gray-600 focus:border-cyan-400/60"
+          />
+        </div>
 
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() =>
-              setFilter("all")
-            }
-            className={`rounded-lg px-4 py-2 text-sm transition ${
-              filter === "all"
-                ? "bg-white text-black"
-                : "bg-neutral-900 text-white hover:bg-neutral-800"
-            }`}
-          >
-            All
-          </button>
-
-          <button
-            onClick={() =>
-              setFilter("active")
-            }
-            className={`rounded-lg px-4 py-2 text-sm transition ${
-              filter === "active"
-                ? "bg-green-400 text-black"
-                : "bg-neutral-900 text-white hover:bg-neutral-800"
-            }`}
-          >
-            Active
-          </button>
-
-          <button
-            onClick={() =>
-              setFilter(
-                "expiring"
-              )
-            }
-            className={`rounded-lg px-4 py-2 text-sm transition ${
-              filter ===
-              "expiring"
-                ? "bg-yellow-400 text-black"
-                : "bg-neutral-900 text-white hover:bg-neutral-800"
-            }`}
-          >
-            Expiring
-          </button>
-
-          <button
-            onClick={() =>
-              setFilter(
-                "expired"
-              )
-            }
-            className={`rounded-lg px-4 py-2 text-sm transition ${
-              filter ===
-              "expired"
-                ? "bg-red-400 text-black"
-                : "bg-neutral-900 text-white hover:bg-neutral-800"
-            }`}
-          >
-            Expired
-          </button>
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label="Filter products"
+        >
+          {(
+            [
+              { key: "all", label: "All" },
+              { key: "active", label: "Active" },
+              { key: "expiring", label: "Expiring" },
+              { key: "expired", label: "Expired" },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setFilter(item.key)}
+              className={`rounded-xl border px-3.5 py-2 text-xs font-medium transition ${
+                filter === item.key
+                  ? "border-white bg-white text-black"
+                  : "border-white/10 text-gray-400 hover:border-white/20 hover:text-white"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {filteredProducts.length ===
-      0 ? (
-        <div className="rounded-2xl border border-gray-800 p-10 text-center">
-          <h2 className="text-2xl font-semibold">
+      {filteredProducts.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/10 px-6 py-14 text-center">
+          <Search className="mx-auto text-gray-600" size={24} />
+          <p className="mt-3 text-sm font-medium text-gray-300">
             No matching products
-          </h2>
-
-          <p className="mt-2 text-gray-400">
-            Try another search or
-            filter.
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Try another search or filter.
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProducts.map(
-            (product) => {
-              const today =
-                new Date();
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredProducts.map((product) => {
+            const thumbnail = getProductThumbnail(product);
+            const daysRemaining = product.warrantyExpiry
+              ? getDaysRemaining(product.warrantyExpiry)
+              : null;
+            const expired = product.warrantyExpiry
+              ? isExpired(product.warrantyExpiry)
+              : false;
+            const expiring = product.warrantyExpiry
+              ? isExpiringSoon(product.warrantyExpiry)
+              : false;
 
-              const expiryDate =
-                new Date(
-                  product.warrantyExpiry
-                );
-
-              const timeDifference =
-                expiryDate.getTime() -
-                today.getTime();
-
-              const daysRemaining =
-                Math.ceil(
-                  timeDifference /
-                    (1000 *
-                      60 *
-                      60 *
-                      24)
-                );
-
-              const isExpired =
-                daysRemaining < 0;
-
-              const isExpiringSoon =
-                daysRemaining <=
-                  30 &&
-                daysRemaining >= 0;
-
-              return (
-                <Link
-                  href={`/dashboard/products/${product.id}`}
-                  key={
-                    product.id
-                  }
-                  className="rounded-2xl border border-gray-800 bg-neutral-900 p-6 transition duration-300 hover:-translate-y-1 hover:border-white hover:shadow-2xl"
-                >
-                  {product.invoiceImage && (
-                    <div className="mb-4 overflow-hidden rounded-xl border border-gray-800">
-                      <Image
-                        src={
-                          product.invoiceImage
-                        }
-                        alt="Invoice"
-                        width={500}
-                        height={300}
-                        priority
-                        className="h-40 w-full object-cover"
-                      />
+            return (
+              <Link
+                key={product.id}
+                href={`/dashboard/products/${product.id}`}
+                className="group overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/80 transition hover:border-white/20"
+              >
+                <div className="relative border-b border-white/5">
+                  {thumbnail ? (
+                    <Image
+                      src={thumbnail}
+                      alt={product.name}
+                      width={500}
+                      height={280}
+                      className="h-40 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-40 items-center justify-center bg-black/40 text-gray-600">
+                      <Package size={32} />
                     </div>
                   )}
 
-                  <h2 className="text-2xl font-bold">
-                    {
-                      product.name
-                    }
-                  </h2>
+                  {daysRemaining !== null && (
+                    <span
+                      className={`absolute left-3 top-3 rounded-full border px-2.5 py-1 text-[11px] font-medium backdrop-blur-md ${
+                        expired
+                          ? "border-red-500/30 bg-red-500/20 text-red-200"
+                          : expiring
+                            ? "border-amber-500/30 bg-amber-500/20 text-amber-200"
+                            : "border-emerald-500/30 bg-emerald-500/20 text-emerald-200"
+                      }`}
+                    >
+                      {expired
+                        ? "Expired"
+                        : expiring
+                          ? `${daysRemaining}d left`
+                          : "Active"}
+                    </span>
+                  )}
+                </div>
 
-                  <p className="mt-2 text-gray-400">
-                    {product.brand ||
-                      "Unknown Brand"}
-                  </p>
-
-                  <div
-                    className={`mt-4 inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                      isExpired
-                        ? "bg-red-500/20 text-red-400"
-                        : isExpiringSoon
-                        ? "bg-yellow-500/20 text-yellow-400"
-                        : "bg-green-500/20 text-green-400"
-                    }`}
-                  >
-                    {isExpired
-                      ? "Expired"
-                      : isExpiringSoon
-                      ? `Expires in ${daysRemaining} days`
-                      : "Active Warranty"}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-white">
+                        {product.name}
+                      </h3>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {product.brand || "Unknown brand"}
+                      </p>
+                    </div>
+                    <ArrowUpRight
+                      size={16}
+                      className="shrink-0 text-gray-600 transition group-hover:text-cyan-300"
+                    />
                   </div>
 
-                  <div className="mt-6 space-y-2 text-sm">
-                    <p>
-                      Purchase Date:{" "}
-                      {new Date(
-                        product.purchaseDate
-                      ).toLocaleDateString(
-                        "en-US"
-                      )}
-                    </p>
-
-                    <p>
-                      Warranty
-                      Expiry:{" "}
-                      {new Date(
-                        product.warrantyExpiry
-                      ).toLocaleDateString(
-                        "en-US"
-                      )}
-                    </p>
+                  <div className="mt-4 space-y-2 text-xs">
+                    <div className="flex justify-between text-gray-500">
+                      <span>Purchase</span>
+                      <span className="text-gray-300">
+                        {product.purchaseDate
+                          ? new Date(product.purchaseDate).toLocaleDateString(
+                              "en-US"
+                            )
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-gray-500">
+                      <span>Expiry</span>
+                      <span className="text-gray-300">
+                        {product.warrantyExpiry
+                          ? new Date(
+                              product.warrantyExpiry
+                            ).toLocaleDateString("en-US")
+                          : "—"}
+                      </span>
+                    </div>
                   </div>
-                </Link>
-              );
-            }
-          )}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
