@@ -1,6 +1,8 @@
+import BackgroundGlow from "@/components/background-glow";
 export default function Loading() {
     return (
-      <main className="min-h-screen bg-black p-4 text-white md:p-10">
+      <main className="relative min-h-screen overflow-hidden bg-black p-4 text-white md:p-10">
+        <BackgroundGlow />
         <div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-gray-800 bg-neutral-900 p-6 md:p-10">
           <div className="h-8 w-40 rounded bg-neutral-800" />
   

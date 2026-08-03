@@ -125,7 +125,7 @@ http://localhost:3000
 - PostgreSQL database
 - Authentication system
 - File upload support
-- Warranty analytics 
+- Warranty analytics  
 
 # Future Improvements
 

@@ -1,315 +1,230 @@
-import { getServerSession } from "next-auth";
-
 import Link from "next/link";
+import {
+  Package,
+  ShieldCheck,
+  ShieldAlert,
+  Clock,
+  Plus,
+} from "lucide-react";
 
+import AnimatedCounter from "@/components/animated-counter";
+import DashboardOverview from "@/components/dashboard-overview";
 import ProductSearch from "@/components/product-search";
+import DashboardShell from "@/components/dashboard-shell";
 
-import { authOptions } from "@/lib/auth";
+import { getSessionUser } from "@/lib/product-access";
 import { prisma } from "@/lib/prisma";
+import { getDaysRemaining, isExpiringSoon } from "@/lib/warranty";
+import { syncInAppNotifications } from "@/lib/notifications";
 
 export default async function DashboardPage() {
-  const session = await getServerSession(
-    authOptions
-  );
-
-  const user = await prisma.user.findUnique({
-    where: {
-      email: session?.user?.email || "",
-    },
-
-    include: {
-      products: {
-        orderBy: {
-          createdAt: "desc",
-        },
-      },
-    },
-  });
+  const user = await getSessionUser();
 
   if (!user) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-black text-white">
-        User not found
-      </main>
-    );
+    return null;
   }
 
-  const today = new Date();
+  await syncInAppNotifications(user.id);
 
-  const expiringProducts =
-    user.products.filter((product) => {
-      if (!product.warrantyExpiry)
-        return false;
+  const products = await prisma.product.findMany({
+    where: { userId: user.id },
+    include: { documents: true },
+    orderBy: { createdAt: "desc" },
+  });
 
-      const expiryDate = new Date(
-        product.warrantyExpiry
-      );
+  const expiringProducts = products.filter(
+    (product) =>
+      product.warrantyExpiry && isExpiringSoon(product.warrantyExpiry)
+  );
 
-      const timeDifference =
-        expiryDate.getTime() -
-        today.getTime();
+  const activeProducts = products.filter((product) => {
+    if (!product.warrantyExpiry) return false;
+    return getDaysRemaining(product.warrantyExpiry) >= 0;
+  });
 
-      const daysRemaining =
-        Math.ceil(
-          timeDifference /
-            (1000 *
-              60 *
-              60 *
-              24)
-        );
+  const expiredProducts = products.filter((product) => {
+    if (!product.warrantyExpiry) return false;
+    return getDaysRemaining(product.warrantyExpiry) < 0;
+  });
 
-      return daysRemaining <= 30;
-    });
-
-  const activeProducts =
-    user.products.filter((product) => {
-      if (!product.warrantyExpiry)
-        return false;
-
-      return (
-        new Date(
-          product.warrantyExpiry
-        ) > today
-      );
-    });
-
-  const expiredProducts =
-    user.products.filter((product) => {
-      if (!product.warrantyExpiry)
-        return false;
-
-      return (
-        new Date(
-          product.warrantyExpiry
-        ) < today
-      );
-    });
+  const firstName = user.name?.split(" ")[0] || "there";
 
   return (
-    <main className="min-h-screen bg-black p-4 text-white md:p-10">
-      <div className="mx-auto max-w-6xl">
-      <div className="mb-10 overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-br from-neutral-900 via-black to-neutral-950">
-        <div className="grid items-center gap-8 p-8 md:grid-cols-2 md:p-12">
-          
-          <div>
-            <div className="mb-4 inline-flex rounded-full border border-cyan-500/20 bg-cyan-500/10 px-4 py-1 text-sm text-cyan-300">
-              AI Powered Warranty Protection
+    <DashboardShell>
+      <div className="flex flex-col gap-8">
+        {/* Welcome header */}
+        <section className="rounded-2xl border border-white/10 bg-neutral-950/80 p-6 md:p-8">
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">
+            Your warranty. Our responsibility.
+          </p>
+          <div className="mt-5 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-xl">
+              <p className="text-sm font-medium text-gray-400">
+                Welcome back, {firstName}
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                Your warranty vault
+              </h1>
+              <p className="mt-3 text-sm leading-7 text-gray-500 md:text-base">
+                Track products, documents, and expiry dates in one calm place.
+              </p>
             </div>
 
-            <h1 className="text-4xl font-bold leading-tight text-white md:text-5xl">
-              Never Lose
-              <span className="text-cyan-400">
-                {" "}A Warranty{" "}
-              </span>
-              Again
-            </h1>
-
-            <p className="mt-5 max-w-xl text-lg text-gray-400">
-              Store invoices, warranty cards,
-              product details, and expiry dates
-              securely in one intelligent vault.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-3">
               <Link
                 href="/dashboard/add-product"
-                className="rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-gray-200"
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-gray-100"
               >
-                Add Product
+                <Plus size={16} />
+                Add product
               </Link>
-
-              <button className="rounded-xl border border-gray-700 px-6 py-3 text-white transition hover:border-cyan-400 hover:text-cyan-300">
-                AI Secure Storage
-              </button>
+              <a
+                href="#products"
+                className="inline-flex items-center rounded-xl border border-white/10 px-5 py-3 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white"
+              >
+                View products
+              </a>
             </div>
           </div>
+        </section>
 
-          <div className="relative flex justify-center">
-            <div className="absolute h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
-
-            <img
-              src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1200&auto=format&fit=crop"
-              alt="Warranty Vault AI"
-              className="relative z-10 w-full max-w-md rounded-2xl border border-gray-800 object-cover shadow-2xl"
-            />
-          </div>
-        </div>
-      </div>
-
-        <div className="mb-10 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-6">
-            <p className="text-sm text-gray-400">
-              Total Products
-            </p>
-
-            <h2 className="mt-3 text-4xl font-bold">
-              {user.products.length}
-            </h2>
-          </div>
-
-          <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-6">
-            <p className="text-sm text-green-300">
-              Active Warranties
-            </p>
-
-            <h2 className="mt-3 text-4xl font-bold text-green-400">
-              {activeProducts.length}
-            </h2>
-          </div>
-
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6">
-            <p className="text-sm text-red-300">
-              Expired
-            </p>
-
-            <h2 className="mt-3 text-4xl font-bold text-red-400">
-              {expiredProducts.length}
-            </h2>
-          </div>
-        </div>
-
-        {expiringProducts.length >
-          0 && (
-          <div className="mb-10 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-6">
+        {/* Stats */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-yellow-400">
-                Warranty Alerts
-              </h2>
+              <p className="text-sm text-gray-500">Products</p>
+              <Package size={16} className="text-gray-600" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-white">
+              <AnimatedCounter value={products.length} />
+            </p>
+          </div>
 
-              <span className="rounded-full bg-yellow-500/20 px-3 py-1 text-sm text-yellow-300">
-                {
-                  expiringProducts.length
-                }{" "}
-                alert
-                {expiringProducts.length >
-                1
-                  ? "s"
-                  : ""}
+          <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">Active</p>
+              <ShieldCheck size={16} className="text-emerald-500" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-emerald-400">
+              <AnimatedCounter value={activeProducts.length} />
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">Expiring soon</p>
+              <Clock size={16} className="text-amber-500" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-amber-400">
+              <AnimatedCounter value={expiringProducts.length} />
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">Expired</p>
+              <ShieldAlert size={16} className="text-red-500" />
+            </div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-red-400">
+              <AnimatedCounter value={expiredProducts.length} />
+            </p>
+          </div>
+        </section>
+
+        {/* Quick insights */}
+        <DashboardOverview
+          totalProducts={products.length}
+          activeProducts={activeProducts.length}
+          expiredProducts={expiredProducts.length}
+          expiringProducts={expiringProducts.length}
+        />
+
+        {/* Alerts */}
+        {expiringProducts.length > 0 && (
+          <section className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-5 md:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-white">
+                  Upcoming expiries
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Warranties that need attention soon
+                </p>
+              </div>
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
+                {expiringProducts.length}
               </span>
             </div>
 
-            <div className="mt-5 space-y-3">
-              {expiringProducts.map(
-                (product) => {
-                  if (
-                    !product.warrantyExpiry
-                  )
-                    return null;
+            <div className="space-y-2">
+              {expiringProducts.map((product) => {
+                if (!product.warrantyExpiry) return null;
+                const daysRemaining = getDaysRemaining(product.warrantyExpiry);
+                const expired = daysRemaining < 0;
 
-                  const expiryDate =
-                    new Date(
-                      product.warrantyExpiry
-                    );
-
-                  const timeDifference =
-                    expiryDate.getTime() -
-                    today.getTime();
-
-                  const daysRemaining =
-                    Math.ceil(
-                      timeDifference /
-                        (1000 *
-                          60 *
-                          60 *
-                          24)
-                    );
-
-                  const isExpired =
-                    daysRemaining < 0;
-
-                  return (
-                    <Link
-                      key={
-                        product.id
-                      }
-                      href={`/dashboard/products/${product.id}`}
-                      className="block rounded-xl border border-yellow-500/20 bg-black/30 p-4 transition hover:border-yellow-400 hover:bg-black/50"
+                return (
+                  <Link
+                    key={product.id}
+                    href={`/dashboard/products/${product.id}`}
+                    className="flex items-center justify-between rounded-xl border border-white/5 bg-black/30 px-4 py-3.5 transition hover:border-amber-400/30 hover:bg-black/50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {product.name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {product.brand || "Unknown brand"}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-sm font-medium ${
+                        expired ? "text-red-400" : "text-amber-300"
+                      }`}
                     >
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="font-semibold">
-                            {
-                              product.name
-                            }
-                          </p>
-
-                          <p className="text-sm text-gray-400">
-                            {product.brand ||
-                              "Unknown Brand"}
-                          </p>
-                        </div>
-
-                        <div
-                          className={`text-sm font-semibold ${
-                            isExpired
-                              ? "text-red-400"
-                              : "text-yellow-300"
-                          }`}
-                        >
-                          {isExpired
-                            ? "Expired"
-                            : `${daysRemaining} days left`}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                }
-              )}
+                      {expired ? "Expired" : `${daysRemaining}d left`}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
-          </div>
+          </section>
         )}
 
-        {user.products.length ===
-        0 ? (
-          <div className="rounded-3xl border border-gray-800 bg-neutral-900 p-14 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white text-4xl text-black">
-              📦
+        {/* Products */}
+        {products.length === 0 ? (
+          <section className="rounded-2xl border border-dashed border-white/10 bg-neutral-950/50 px-6 py-16 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-cyan-300">
+              <Package size={24} />
             </div>
-
-            <h2 className="mt-6 text-3xl font-bold">
-              No Products Added Yet
+            <h2 className="mt-6 text-2xl font-semibold tracking-tight text-white">
+              No products yet
             </h2>
-
-            <p className="mx-auto mt-3 max-w-md text-gray-400">
-              Start tracking your
-              warranties,
-              invoices, and
-              expiry dates in one
-              secure place.
+            <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-gray-500">
+              Add your first product with an invoice or warranty card to start
+              tracking expiry dates and reminders.
             </p>
-
             <Link
               href="/dashboard/add-product"
-              className="mt-8 inline-flex rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-gray-200"
+              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-gray-100"
             >
-              Add Your First
-              Product
+              <Plus size={16} />
+              Add first product
             </Link>
-          </div>
+          </section>
         ) : (
-        <ProductSearch
-          products={user.products.map(
-            (product) => ({
-              ...product,
-              brand:
-                product.brand || "",
-              serialNumber:
-                product.serialNumber ||
-                "",
-              warrantyExpiry:
-                product.warrantyExpiry ||
-                new Date(),
-              purchaseDate:
-                product.purchaseDate ||
-                new Date(),
-              invoiceImage:
-                product.invoiceImage ||
-                "",
-            })
-          )}
-        />
+          <section id="products" className="space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-white">
+                Your products
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Search and filter by warranty status
+              </p>
+            </div>
+            <ProductSearch products={products} />
+          </section>
         )}
       </div>
-    </main>
+    </DashboardShell>
   );
 }
