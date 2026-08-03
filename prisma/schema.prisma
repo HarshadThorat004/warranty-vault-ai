@@ -8,66 +8,54 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  password  String
-  image     String?
-  createdAt DateTime @default(now())
-
-  products Product[]
+  id                String             @id @default(cuid())
+  name              String?
+  email             String             @unique
+  password          String
+  image             String?
+  createdAt         DateTime           @default(now())
+  products          Product[]
+  notificationLogs  NotificationLog[]
 }
 
 model Product {
-  id                String      @id @default(cuid())
-
-  name              String
-
-  brand             String?
-
-  serialNumber      String?
-
-
-  purchaseDate      DateTime?
-
-  warrantyExpiry    DateTime?
-
-  invoiceImage      String?
-
-  createdAt         DateTime    @default(now())
-
-  userId            String
-
-  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  warranty          Warranty?
-
-  documents         Document[]
-}
-
-model Warranty {
-  id                 String   @id @default(cuid())
-  expiryDate         DateTime
-  warrantyDuration   Int
-  warrantyType       String?
-  extensionAvailable Boolean  @default(false)
-
-  productId String  @unique
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id                 String             @id @default(cuid())
+  name               String
+  brand              String?
+  serialNumber       String?
+  purchaseDate       DateTime?
+  warrantyExpiry     DateTime?
+  invoiceImage       String?
+  notes              String?
+  renewalAvailable   Boolean            @default(false)
+  renewalNotes       String?
+  createdAt          DateTime           @default(now())
+  userId             String
+  documents          Document[]
+  notificationLogs   NotificationLog[]
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Document {
-  id          String   @id @default(cuid())
-
-  fileUrl     String
-
-  fileType    String
-
+  id           String   @id @default(cuid())
+  fileUrl      String
+  fileType     String
+  uploadedAt   DateTime @default(now())
+  productId    String
   documentType String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
 
-  uploadedAt  DateTime @default(now())
+model NotificationLog {
+  id        String    @id @default(cuid())
+  userId    String
+  productId String
+  type      String
+  channel   String
+  sentAt    DateTime  @default(now())
+  readAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  productId   String
-
-  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@unique([productId, type, channel])
 }
