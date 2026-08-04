@@ -16,7 +16,7 @@ Track warranties, upload invoices, manage product documents, and monitor expiry 
 - Invoice & warranty document storage
 - Product detail pages
 - Warranty usage progress tracking
-- Authentication system
+- Authentication system (password, Google, email OTP)
 - Responsive UI
 - REST API architecture
 - Prisma ORM integration
@@ -38,7 +38,7 @@ Track warranties, upload invoices, manage product documents, and monitor expiry 
 - PostgreSQL
 
 ## Authentication
-- NextAuth.js
+- NextAuth.js (credentials, Google, email OTP)
 
 ## File Uploads
 - UploadThing
@@ -114,6 +114,82 @@ http://localhost:3000
 
 ---
 
+# Email notifications (Resend)
+
+Warranty reminders are sent via [Resend](https://resend.com). Set these in `.env` (local) and Vercel (production):
+
+```bash
+RESEND_API_KEY=re_xxxxxxxx
+RESEND_FROM_EMAIL=Warranty Vault <onboarding@resend.dev>
+RESEND_REPLY_TO=warrantyvault.in@gmail.com
+CRON_SECRET=your-random-secret
+```
+
+| Variable | Purpose |
+|----------|---------|
+| `RESEND_FROM_EMAIL` | Visible From address (must be a Resend-verified sender) |
+| `RESEND_REPLY_TO` | Where user replies go (your Warranty Vault Gmail) |
+| `CRON_SECRET` | Protects `/api/cron/reminders` and `/api/cron/test-email` |
+
+**Important:** Resend cannot send *from* `@gmail.com`. For production branding, verify your domain (e.g. `warrantyvault.in`) in the Resend dashboard (add SPF/DKIM DNS records), then set:
+
+```bash
+RESEND_FROM_EMAIL=Warranty Vault <noreply@warrantyvault.in>
+RESEND_REPLY_TO=warrantyvault.in@gmail.com
+```
+
+Until the domain is verified, use `onboarding@resend.dev` for From. On the free tier, that sender can only deliver to the email on your Resend account.
+
+### Test send (local)
+
+```bash
+curl -X POST http://localhost:3000/api/cron/test-email \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"your-resend-account@email.com"}'
+# Use :3001 if another app already occupies :3000
+```
+
+Daily production reminders run via [`vercel.json`](vercel.json) → `GET /api/cron/reminders`.
+
+---
+
+# Free sign-in options (Google / Email OTP)
+
+All of these are free to set up. SMS OTP is intentionally **not** included (SMS providers charge money).
+
+## 1) Google Sign-In (free)
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a project → **APIs & Services → Credentials → Create credentials → OAuth client ID**
+3. Application type: **Web application**
+4. Authorized redirect URI:
+   - Local: `http://localhost:3000/api/auth/callback/google`
+   - Prod: `https://YOUR_DOMAIN/api/auth/callback/google`
+5. Copy Client ID + Client Secret into env:
+
+```bash
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxxx
+```
+
+## 2) Email one-time code (free via Resend)
+
+Uses your existing `RESEND_API_KEY`. Users get a 6-digit code that expires in 10 minutes. If the user does not exist yet, an account is created automatically (passwordless).
+
+No extra paid service required. Resend free tier is enough for development and early traffic.
+
+## Required NextAuth env
+
+```bash
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=generate-a-long-random-string
+```
+
+If Google env vars are missing, that button stays hidden automatically. Password login always remains available.
+
+---
+
 # Production Features
 
 - App Router architecture
@@ -125,12 +201,11 @@ http://localhost:3000
 - PostgreSQL database
 - Authentication system
 - File upload support
-- Warranty analytics  
+- Warranty analytics
+- Email warranty reminders (Resend + cron)
 
 # Future Improvements
 
-- AI OCR invoice scanning
-- Email warranty reminders
 - PDF preview support
 - Analytics dashboard
 - Multi-user organization support
