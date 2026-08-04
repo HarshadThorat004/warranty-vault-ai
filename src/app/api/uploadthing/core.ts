@@ -16,11 +16,11 @@ export const ourFileRouter = {
     .middleware(async () => {
       const session = await getServerSession(authOptions);
 
-      if (!session?.user?.email) {
+      if (!session?.user?.id) {
         throw new UploadThingError("Unauthorized");
       }
 
-      return { userEmail: session.user.email };
+      return { userId: session.user.id };
     })
     .onUploadComplete(async ({ file }) => {
       return {
