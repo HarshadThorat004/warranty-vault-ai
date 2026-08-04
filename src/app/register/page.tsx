@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import BackgroundGlow from "@/components/background-glow";
+import SocialAuthButtons from "@/components/social-auth-buttons";
 import { registerSchema } from "@/lib/validations/auth";
 
 const inputClass =
@@ -28,16 +29,16 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const {
+    control,
     register,
     handleSubmit,
-    watch,
     formState: { errors, isValid },
   } = useForm({
     resolver: zodResolver(registerSchema),
     mode: "onChange",
   });
 
-  const password = watch("password") || "";
+  const password = useWatch({ control, name: "password" }) || "";
 
   async function onSubmit(data: {
     name: string;
@@ -152,12 +153,15 @@ export default function RegisterPage() {
                 Create account
               </h2>
               <p className="mt-2 text-sm text-gray-500">
-                Just three fields — then you&apos;re ready.
+                Continue with Google, or create an email account.
               </p>
+
+              <div className="mt-7 space-y-5">
+                <SocialAuthButtons mode="signup" showOtpShortcut={false} />
 
               <form
                 onSubmit={handleSubmit(onSubmit)}
-                className="mt-7 space-y-4"
+                className="space-y-4"
               >
                 <div>
                   <label
@@ -215,7 +219,7 @@ export default function RegisterPage() {
                       id="password"
                       type={showPassword ? "text" : "password"}
                       autoComplete="new-password"
-                      placeholder="At least 6 characters"
+                      placeholder="At least 8 characters"
                       className={`${inputClass} pr-11`}
                       {...register("password")}
                     />
@@ -232,11 +236,11 @@ export default function RegisterPage() {
                   </div>
                   <p
                     className={`mt-2 flex items-center gap-1.5 text-xs ${
-                      password.length >= 6 ? "text-cyan-300" : "text-gray-600"
+                      password.length >= 8 ? "text-cyan-300" : "text-gray-600"
                     }`}
                   >
                     <Check size={12} />
-                    At least 6 characters
+                    At least 8 characters
                   </p>
                   {errors.password && (
                     <p className="mt-1.5 text-sm text-red-400">
@@ -263,8 +267,19 @@ export default function RegisterPage() {
                   )}
                 </button>
               </form>
+              </div>
 
               <p className="mt-6 text-center text-sm text-gray-500">
+                Prefer a one-time code?{" "}
+                <Link
+                  href="/login"
+                  className="font-medium text-cyan-300 hover:underline"
+                >
+                  Sign in with email OTP
+                </Link>
+              </p>
+
+              <p className="mt-3 text-center text-sm text-gray-500">
                 Already registered?{" "}
                 <Link
                   href="/login"
