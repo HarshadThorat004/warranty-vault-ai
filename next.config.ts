@@ -1,11 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: [
+    "@prisma/client",
+    "prisma",
+    "pdf-parse",
+    "tesseract.js",
+    "sharp",
+  ],
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "94rpuyj9r1.ufs.sh",
+        hostname: "*.ufs.sh",
+      },
+      {
+        protocol: "https",
+        hostname: "utfs.io",
       },
       {
         protocol: "https",
