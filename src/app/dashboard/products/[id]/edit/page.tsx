@@ -66,6 +66,7 @@ export default async function EditPage({ params }: Props) {
                 name: product.name,
                 brand: product.brand || "",
                 serialNumber: product.serialNumber || "",
+                invoiceNumber: product.invoiceNumber || "",
                 purchaseDate:
                   product.purchaseDate?.toISOString().split("T")[0] || "",
                 warrantyExpiry:

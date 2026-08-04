@@ -47,6 +47,8 @@ export function buildProductWhere(
       OR: [
         { name: { contains: params.q, mode: "insensitive" } },
         { brand: { contains: params.q, mode: "insensitive" } },
+        { serialNumber: { contains: params.q, mode: "insensitive" } },
+        { invoiceNumber: { contains: params.q, mode: "insensitive" } },
       ],
     });
   }
@@ -84,6 +86,7 @@ const productListSelect = {
   name: true,
   brand: true,
   serialNumber: true,
+  invoiceNumber: true,
   purchaseDate: true,
   warrantyExpiry: true,
   invoiceImage: true,

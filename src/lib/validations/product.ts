@@ -10,6 +10,7 @@ const baseProductFields = {
   name: z.string().min(1, "Product name is required").max(200),
   brand: z.string().max(100).optional().nullable(),
   serialNumber: z.string().max(100).optional().nullable(),
+  invoiceNumber: z.string().max(100).optional().nullable(),
   purchaseDate: z.string().min(1, "Purchase date is required"),
   warrantyExpiry: z.string().min(1, "Warranty expiry is required"),
   notes: z.string().max(2000).optional().nullable(),

@@ -49,6 +49,7 @@ export async function POST(req: Request) {
         name: data.name,
         brand: data.brand || null,
         serialNumber: data.serialNumber || null,
+        invoiceNumber: data.invoiceNumber || null,
         purchaseDate: new Date(data.purchaseDate),
         warrantyExpiry: new Date(data.warrantyExpiry),
         invoiceImage: data.invoiceImage || null,

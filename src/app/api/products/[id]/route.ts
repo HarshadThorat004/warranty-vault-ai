@@ -65,6 +65,7 @@ export async function PUT(
         name: data.name,
         brand: data.brand ?? null,
         serialNumber: data.serialNumber ?? null,
+        invoiceNumber: data.invoiceNumber ?? null,
         purchaseDate: data.purchaseDate
           ? new Date(data.purchaseDate)
           : undefined,

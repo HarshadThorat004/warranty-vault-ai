@@ -38,6 +38,7 @@ model Product {
   name               String
   brand              String?
   serialNumber       String?
+  invoiceNumber      String?
   purchaseDate       DateTime?
   warrantyExpiry     DateTime?
   invoiceImage       String?

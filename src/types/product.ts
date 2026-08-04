@@ -10,6 +10,7 @@ export interface Product {
   name: string;
   brand: string | null;
   serialNumber?: string | null;
+  invoiceNumber?: string | null;
   purchaseDate: Date | null;
   warrantyExpiry: Date | null;
   invoiceImage: string | null;

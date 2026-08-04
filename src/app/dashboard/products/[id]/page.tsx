@@ -117,7 +117,8 @@ export default async function ProductPage({ params }: Props) {
               </h1>
               <p className="mt-2 text-sm text-gray-500">
                 {product.brand ?? "Unknown brand"}
-                {product.serialNumber ? ` · ${product.serialNumber}` : ""}
+                {product.invoiceNumber ? ` · Invoice ${product.invoiceNumber}` : ""}
+                {product.serialNumber ? ` · SN ${product.serialNumber}` : ""}
               </p>
 
               {product.renewalAvailable && (
