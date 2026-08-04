@@ -1,31 +1,45 @@
-import { NextResponse } from "next/server";
-
-import { prisma } from "@/lib/prisma";
+import { jsonError, jsonSuccess } from "@/lib/api";
+import { listProductsForUser, parseProductListParams } from "@/lib/products-query";
 import { getSessionUser } from "@/lib/product-access";
+import { prisma } from "@/lib/prisma";
 import { productCreateSchema } from "@/lib/validations/product";
+
+export async function GET(req: Request) {
+  try {
+    const user = await getSessionUser();
+
+    if (!user) {
+      return jsonError("Unauthorized", 401);
+    }
+
+    const url = new URL(req.url);
+    const products = await listProductsForUser(
+      user.id,
+      parseProductListParams(url.searchParams)
+    );
+
+    return jsonSuccess(products);
+  } catch (error) {
+    console.error("PRODUCT_LIST_ERROR", error);
+    return jsonError("Failed to load products");
+  }
+}
 
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return jsonError("Unauthorized", 401);
     }
 
     const body = await req.json();
     const parsed = productCreateSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: "Validation failed",
-          details: parsed.error.flatten().fieldErrors,
-        },
-        { status: 400 }
-      );
+      return jsonError("Validation failed", 400, {
+        details: parsed.error.flatten().fieldErrors,
+      });
     }
 
     const data = parsed.data;
@@ -37,6 +51,7 @@ export async function POST(req: Request) {
         serialNumber: data.serialNumber || null,
         purchaseDate: new Date(data.purchaseDate),
         warrantyExpiry: new Date(data.warrantyExpiry),
+        invoiceImage: data.invoiceImage || null,
         notes: data.notes || null,
         renewalAvailable: data.renewalAvailable ?? false,
         renewalNotes: data.renewalNotes || null,
@@ -57,13 +72,9 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json(product, { status: 201 });
+    return jsonSuccess(product, 201);
   } catch (error) {
     console.error("PRODUCT_CREATE_ERROR", error);
-
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    );
+    return jsonError("Something went wrong");
   }
 }

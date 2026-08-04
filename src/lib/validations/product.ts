@@ -16,7 +16,7 @@ const baseProductFields = {
   renewalAvailable: z.boolean().optional(),
   renewalNotes: z.string().max(500).optional().nullable(),
   invoiceImage: z.string().url().optional().nullable(),
-  documents: z.array(documentSchema).optional(),
+  documents: z.array(documentSchema).max(10, "You can upload up to 10 documents").optional(),
 };
 
 function refineDates(

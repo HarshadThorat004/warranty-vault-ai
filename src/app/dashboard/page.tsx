@@ -13,9 +13,8 @@ import ProductSearch from "@/components/product-search";
 import DashboardShell from "@/components/dashboard-shell";
 
 import { getSessionUser } from "@/lib/product-access";
-import { prisma } from "@/lib/prisma";
 import { getDaysRemaining, isExpiringSoon } from "@/lib/warranty";
-import { syncInAppNotifications } from "@/lib/notifications";
+import { getDashboardCounts, listProductsForUser } from "@/lib/products-query";
 
 export default async function DashboardPage() {
   const user = await getSessionUser();
@@ -24,28 +23,15 @@ export default async function DashboardPage() {
     return null;
   }
 
-  await syncInAppNotifications(user.id);
-
-  const products = await prisma.product.findMany({
-    where: { userId: user.id },
-    include: { documents: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [{ items: products }, counts] = await Promise.all([
+    listProductsForUser(user.id, { limit: 50 }),
+    getDashboardCounts(user.id),
+  ]);
 
   const expiringProducts = products.filter(
     (product) =>
       product.warrantyExpiry && isExpiringSoon(product.warrantyExpiry)
   );
-
-  const activeProducts = products.filter((product) => {
-    if (!product.warrantyExpiry) return false;
-    return getDaysRemaining(product.warrantyExpiry) >= 0;
-  });
-
-  const expiredProducts = products.filter((product) => {
-    if (!product.warrantyExpiry) return false;
-    return getDaysRemaining(product.warrantyExpiry) < 0;
-  });
 
   const firstName = user.name?.split(" ")[0] || "there";
 
@@ -96,7 +82,7 @@ export default async function DashboardPage() {
               <Package size={16} className="text-gray-600" />
             </div>
             <p className="mt-3 text-3xl font-semibold tracking-tight text-white">
-              <AnimatedCounter value={products.length} />
+              <AnimatedCounter value={counts.totalProducts} />
             </p>
           </div>
 
@@ -106,7 +92,7 @@ export default async function DashboardPage() {
               <ShieldCheck size={16} className="text-emerald-500" />
             </div>
             <p className="mt-3 text-3xl font-semibold tracking-tight text-emerald-400">
-              <AnimatedCounter value={activeProducts.length} />
+              <AnimatedCounter value={counts.activeProducts} />
             </p>
           </div>
 
@@ -116,7 +102,7 @@ export default async function DashboardPage() {
               <Clock size={16} className="text-amber-500" />
             </div>
             <p className="mt-3 text-3xl font-semibold tracking-tight text-amber-400">
-              <AnimatedCounter value={expiringProducts.length} />
+              <AnimatedCounter value={counts.expiringProducts} />
             </p>
           </div>
 
@@ -126,17 +112,17 @@ export default async function DashboardPage() {
               <ShieldAlert size={16} className="text-red-500" />
             </div>
             <p className="mt-3 text-3xl font-semibold tracking-tight text-red-400">
-              <AnimatedCounter value={expiredProducts.length} />
+              <AnimatedCounter value={counts.expiredProducts} />
             </p>
           </div>
         </section>
 
         {/* Quick insights */}
         <DashboardOverview
-          totalProducts={products.length}
-          activeProducts={activeProducts.length}
-          expiredProducts={expiredProducts.length}
-          expiringProducts={expiringProducts.length}
+          totalProducts={counts.totalProducts}
+          activeProducts={counts.activeProducts}
+          expiredProducts={counts.expiredProducts}
+          expiringProducts={counts.expiringProducts}
         />
 
         {/* Alerts */}
