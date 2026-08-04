@@ -1,33 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
-import { addDays, startOfDay } from "date-fns";
+import { Prisma } from "@prisma/client";
+import { NextRequest } from "next/server";
 
+import { jsonError, jsonSuccess } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { sendReminderEmail } from "@/lib/email";
 import {
-  CRITICAL_EXPIRING_DAYS,
-  EXPIRING_SOON_DAYS,
-} from "@/constants/warranty";
+  getReminderPeriodKey,
+  getReminderTypes,
+  getReminderWindowDates,
+  type ReminderType,
+} from "@/lib/reminders";
 
-type ReminderType =
-  | "expiring_30"
-  | "expiring_7"
-  | "expired"
-  | "renewal_available";
+const BATCH_SIZE = 100;
 
-async function createNotification(params: {
+async function hasEmailNotification(params: {
+  productId: string;
+  type: ReminderType;
+  periodKey: string;
+}) {
+  const existing = await prisma.notificationLog.findFirst({
+    where: {
+      productId: params.productId,
+      type: params.type,
+      channel: "email",
+      periodKey: params.periodKey,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(existing);
+}
+
+async function createEmailNotification(params: {
   userId: string;
   productId: string;
   type: ReminderType;
-  channel: "email" | "in_app";
+  periodKey: string;
 }) {
   try {
     await prisma.notificationLog.create({
-      data: params,
+      data: {
+        ...params,
+        channel: "email",
+      },
     });
     return true;
-  } catch {
-    // Unique constraint — already sent
-    return false;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return false;
+    }
+
+    throw error;
   }
 }
 
@@ -37,91 +65,84 @@ export async function GET(req: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
 
     if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return jsonError("Unauthorized", 401);
     }
 
-    const today = startOfDay(new Date());
-    const in7 = addDays(today, CRITICAL_EXPIRING_DAYS);
-    const in30 = addDays(today, EXPIRING_SOON_DAYS);
-
-    const products = await prisma.product.findMany({
-      where: {
-        warrantyExpiry: {
-          not: null,
-        },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-      },
-    });
-
+    const { in30 } = getReminderWindowDates();
+    let cursor: string | undefined;
     let emailsSent = 0;
     let inAppCreated = 0;
     let skipped = 0;
+    let processed = 0;
 
-    for (const product of products) {
-      if (!product.warrantyExpiry) continue;
+    for (;;) {
+      const products = await prisma.product.findMany({
+        where: {
+          OR: [
+            {
+              warrantyExpiry: {
+                lte: in30,
+              },
+            },
+            {
+              renewalAvailable: true,
+            },
+          ],
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          id: "asc",
+        },
+        take: BATCH_SIZE,
+        ...(cursor
+          ? {
+              cursor: { id: cursor },
+              skip: 1,
+            }
+          : {}),
+      });
 
-      const expiry = startOfDay(new Date(product.warrantyExpiry));
-      const types: ReminderType[] = [];
-
-      if (expiry.getTime() === today.getTime() || expiry < today) {
-        types.push("expired");
-      } else if (expiry.getTime() === in7.getTime() || (expiry > today && expiry <= in7)) {
-        // Critical window: within 7 days (and not already expired)
-        if (expiry <= in7) {
-          types.push("expiring_7");
-        }
-      } else if (expiry <= in30) {
-        types.push("expiring_30");
+      if (products.length === 0) {
+        break;
       }
 
-      if (product.renewalAvailable) {
-        types.push("renewal_available");
-      }
+      processed += products.length;
 
-      // Prefer the most urgent expiry type only (avoid both 30 and 7)
-      const expiryTypes = types.filter((t) =>
-        t === "expired" || t === "expiring_7" || t === "expiring_30"
-      );
-      const orderedExpiry: ReminderType[] = [];
-      if (expiryTypes.includes("expired")) orderedExpiry.push("expired");
-      else if (expiryTypes.includes("expiring_7")) orderedExpiry.push("expiring_7");
-      else if (expiryTypes.includes("expiring_30")) orderedExpiry.push("expiring_30");
+      const inAppData: Prisma.NotificationLogCreateManyInput[] = [];
 
-      const finalTypes: ReminderType[] = [
-        ...orderedExpiry,
-        ...(types.includes("renewal_available") ? (["renewal_available"] as const) : []),
-      ];
+      for (const product of products) {
+        const types = getReminderTypes(product);
 
-      for (const type of finalTypes) {
-        const createdInApp = await createNotification({
-          userId: product.userId,
-          productId: product.id,
-          type,
-          channel: "in_app",
-        });
+        for (const type of types) {
+          const periodKey = getReminderPeriodKey(type, product.warrantyExpiry);
 
-        if (createdInApp) {
-          inAppCreated += 1;
-        } else {
-          skipped += 1;
-        }
+          inAppData.push({
+            userId: product.userId,
+            productId: product.id,
+            type,
+            channel: "in_app",
+            periodKey,
+          });
 
-        const createdEmail = await createNotification({
-          userId: product.userId,
-          productId: product.id,
-          type,
-          channel: "email",
-        });
+          const alreadySent = await hasEmailNotification({
+            productId: product.id,
+            type,
+            periodKey,
+          });
 
-        if (createdEmail) {
+          if (alreadySent) {
+            skipped += 1;
+            continue;
+          }
+
           const result = await sendReminderEmail({
             to: product.user.email,
             userName: product.user.name,
@@ -132,27 +153,48 @@ export async function GET(req: NextRequest) {
             renewalNotes: product.renewalNotes,
           });
 
-          if (!result.skipped) {
-            emailsSent += 1;
+          if (result.skipped) {
+            skipped += 1;
+            continue;
           }
-        } else {
-          skipped += 1;
+
+          const createdEmail = await createEmailNotification({
+            userId: product.userId,
+            productId: product.id,
+            type,
+            periodKey,
+          });
+
+          if (createdEmail) {
+            emailsSent += 1;
+          } else {
+            skipped += 1;
+          }
         }
       }
+
+      if (inAppData.length > 0) {
+        const result = await prisma.notificationLog.createMany({
+          data: inAppData,
+          skipDuplicates: true,
+        });
+
+        inAppCreated += result.count;
+        skipped += inAppData.length - result.count;
+      }
+
+      cursor = products.at(-1)?.id;
     }
 
-    return NextResponse.json({
+    return jsonSuccess({
       success: true,
-      processed: products.length,
+      processed,
       emailsSent,
       inAppCreated,
       skipped,
     });
   } catch (error) {
     console.error("CRON_REMINDERS_ERROR", error);
-    return NextResponse.json(
-      { error: "Failed to process reminders" },
-      { status: 500 }
-    );
+    return jsonError("Failed to process reminders");
   }
 }
