@@ -5,31 +5,26 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import {
-  Eye,
-  EyeOff,
-  ShieldCheck,
-  ArrowRight,
-  Loader2,
-} from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
-import BackgroundGlow from "@/components/background-glow";
+import AuthShell, {
+  AuthBrandMark,
+  AuthLegalFooter,
+  authInputClass,
+  authPrimaryButtonClass,
+} from "@/components/auth/auth-shell";
 import EmailOtpForm from "@/components/email-otp-form";
 import SocialAuthButtons from "@/components/social-auth-buttons";
-
-const inputClass =
-  "w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-cyan-400/60";
 
 export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <main className="relative min-h-screen overflow-hidden bg-black text-white">
-          <BackgroundGlow />
-          <div className="relative z-10 flex min-h-screen items-center justify-center">
-            <Loader2 className="animate-spin text-gray-500" size={20} />
+        <AuthShell showHomeLink={false}>
+          <div className="flex justify-center py-20">
+            <Loader2 className="animate-spin text-white/40" size={20} />
           </div>
-        </main>
+        </AuthShell>
       }
     >
       <LoginPageContent />
@@ -50,7 +45,11 @@ function LoginPageContent() {
     const error = searchParams.get("error");
     if (!error) return;
 
-    if (error === "OAuthCallback" || error === "OAuthSignin" || error === "google") {
+    if (
+      error === "OAuthCallback" ||
+      error === "OAuthSignin" ||
+      error === "google"
+    ) {
       toast.error(
         "Google sign-in failed. Open the app at http://localhost:3000 (not 127.0.0.1) and try again."
       );
@@ -92,124 +91,108 @@ function LoginPageContent() {
     }
   }
 
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !loading;
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-white">
-      <BackgroundGlow />
-
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
-        <Link href="/" className="mb-8 inline-flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400 text-black">
-            <ShieldCheck size={18} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Warranty Vault AI</p>
-            <p className="text-[11px] text-gray-500">
-              Your warranty. Our responsibility.
-            </p>
-          </div>
-        </Link>
-
-        <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-6 sm:p-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Use Google, email code, or your password to sign in.
-          </p>
-
-          <div className="mt-7 space-y-5">
-            {mode === "password" ? (
-              <>
-                <SocialAuthButtons
-                  mode="signin"
-                  onUseOtp={() => setMode("otp")}
-                />
-
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="mb-1.5 block text-sm text-gray-400"
-                    >
-                      Email
-                    </label>
-                    <input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      autoFocus
-                      placeholder="you@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className={inputClass}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="password"
-                      className="mb-1.5 block text-sm text-gray-400"
-                    >
-                      Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        placeholder="Your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className={`${inputClass} pr-11`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Signing in…
-                      </>
-                    ) : (
-                      <>
-                        Sign in
-                        <ArrowRight size={16} />
-                      </>
-                    )}
-                  </button>
-                </form>
-              </>
-            ) : (
-              <EmailOtpForm onBack={() => setMode("password")} />
-            )}
-          </div>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            New here?{" "}
-            <Link
-              href="/register"
-              className="font-medium text-cyan-300 hover:underline"
-            >
-              Create an account
-            </Link>
-          </p>
-        </div>
+    <AuthShell>
+      <div className="text-center">
+        <AuthBrandMark />
+        <h1 className="mt-6 text-[28px] font-semibold tracking-tight text-white sm:text-[32px]">
+          Log in to Warranty Vault
+        </h1>
+        <p className="mt-2 text-sm text-white/45">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="text-white underline decoration-white/30 underline-offset-2 hover:decoration-white/60"
+          >
+            Sign up.
+          </Link>
+        </p>
       </div>
-    </main>
+
+      <div className="mt-8">
+        {mode === "password" ? (
+          <div className="space-y-5">
+            <SocialAuthButtons
+              mode="signin"
+              onUseOtp={() => setMode("otp")}
+            />
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-1.5 block text-xs text-white/50"
+                >
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus
+                  placeholder="alan.turing@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className={authInputClass}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-1.5 block text-xs text-white/50"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className={`${authInputClass} pr-11`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35 hover:text-white"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className={authPrimaryButtonClass}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    Logging in…
+                  </>
+                ) : (
+                  "Log In"
+                )}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <EmailOtpForm onBack={() => setMode("password")} />
+        )}
+      </div>
+
+      <AuthLegalFooter action="in" />
+    </AuthShell>
   );
 }

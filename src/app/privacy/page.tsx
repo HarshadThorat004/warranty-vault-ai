@@ -1,0 +1,248 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import Link from "next/link";
+
+import AuthShell, { AuthBrandMark } from "@/components/auth/auth-shell";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy — Warranty Vault AI",
+  description: "Privacy Policy for Warranty Vault AI",
+};
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold text-white">{title}</h2>
+      <div className="space-y-3 text-sm leading-7 text-white/55">{children}</div>
+    </section>
+  );
+}
+
+export default function PrivacyPage() {
+  return (
+    <AuthShell wide>
+      <div className="text-center">
+        <AuthBrandMark />
+        <h1 className="mt-6 text-3xl font-semibold tracking-tight text-white">
+          Privacy Policy
+        </h1>
+        <p className="mt-2 text-sm text-white/40">
+          Last updated: August 4, 2026
+        </p>
+      </div>
+
+      <div className="mt-10 space-y-8">
+        <p className="text-sm leading-7 text-white/55">
+          This Privacy Policy explains how Warranty Vault AI (&quot;we,&quot;
+          &quot;us&quot;) collects, uses, stores, and shares information when
+          you use our website and application at warrantyvault.in (the
+          &quot;Service&quot;). By using the Service, you acknowledge this
+          Policy.
+        </p>
+        <p className="text-sm leading-7 text-white/40">
+          This document is a practical startup template and is not legal advice.
+          Privacy requirements can vary; consult counsel for your situation.
+        </p>
+
+        <Section title="1. Who this applies to">
+          <p>
+            This Policy applies to users of Warranty Vault AI, primarily
+            individuals who store product warranties, receipts, and related
+            documents and who may receive expiry reminders. Our intended audience
+            includes users in India and elsewhere who choose to use the Service.
+          </p>
+          <p>
+            Contact:{" "}
+            <a
+              href="mailto:warrantyvault.in@gmail.com"
+              className="text-white/80 underline decoration-white/25 underline-offset-2"
+            >
+              warrantyvault.in@gmail.com
+            </a>
+            .
+          </p>
+        </Section>
+
+        <Section title="2. Information we collect">
+          <p>
+            <strong className="font-medium text-white/80">Account information.</strong>{" "}
+            Name, email address, authentication identifiers, and password hashes
+            (if you use email/password). If you sign in with Google, we receive
+            basic profile information Google shares with us (such as name, email,
+            and profile image, depending on your Google settings).
+          </p>
+          <p>
+            <strong className="font-medium text-white/80">User content.</strong>{" "}
+            Product and warranty details you enter, notes, reminder preferences,
+            and files you upload (for example invoices, warranty cards, and
+            receipts) via our storage providers.
+          </p>
+          <p>
+            <strong className="font-medium text-white/80">Technical data.</strong>{" "}
+            Approximate usage logs such as IP address, device/browser type,
+            timestamps, and error diagnostics needed to operate and secure the
+            Service.
+          </p>
+          <p>
+            <strong className="font-medium text-white/80">Communications.</strong>{" "}
+            Content of support emails you send us, and records related to OTP or
+            reminder emails we send you.
+          </p>
+        </Section>
+
+        <Section title="3. How we use information">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Create and manage your account and authenticate you</li>
+            <li>Store and display your warranty vault and related documents</li>
+            <li>
+              Process documents with OCR/AI (where enabled) to help extract
+              product or warranty fields
+            </li>
+            <li>
+              Send transactional emails such as sign-in codes and warranty expiry
+              reminders you enable
+            </li>
+            <li>Maintain security, prevent abuse, and troubleshoot issues</li>
+            <li>Improve the Service and comply with legal obligations</li>
+          </ul>
+          <p>
+            We do not sell your personal information. We do not use your warranty
+            documents to train public AI models for unrelated commercial products
+            beyond operating the features you use in the Service.
+          </p>
+        </Section>
+
+        <Section title="4. How we share information">
+          <p>
+            We share information with service providers who process data on our
+            behalf to run the Service, including:
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Google — OAuth sign-in</li>
+            <li>Resend — OTP and reminder email delivery</li>
+            <li>UploadThing — file uploads and storage</li>
+            <li>Hosting and infrastructure providers (for example Vercel)</li>
+            <li>Postgres/database hosting for application data</li>
+            <li>
+              AI/OCR providers (for example Google Gemini) when document
+              extraction features are used
+            </li>
+          </ul>
+          <p>
+            We may also disclose information if required by law, to protect
+            rights and safety, or in connection with a merger, acquisition, or
+            reorganization, subject to appropriate safeguards.
+          </p>
+        </Section>
+
+        <Section title="5. Cookies and similar technologies">
+          <p>
+            We use cookies and similar technologies as needed for authentication
+            sessions, security, and basic Service functionality. You can control
+            cookies through your browser settings; disabling essential cookies may
+            prevent sign-in from working.
+          </p>
+        </Section>
+
+        <Section title="6. Data retention">
+          <p>
+            We retain account and User Content while your account remains active
+            and as needed to provide the Service. You may request deletion of
+            your account by contacting us. We may retain limited records after
+            deletion where required for security, dispute resolution, backups, or
+            legal compliance, for a reasonable period.
+          </p>
+        </Section>
+
+        <Section title="7. Security">
+          <p>
+            We take reasonable technical and organizational measures to protect
+            personal data (such as encrypted transport, access controls, and
+            hashed passwords for credential accounts). No method of transmission
+            or storage is completely secure; please use a strong unique password
+            and protect access to your email for OTP sign-in.
+          </p>
+        </Section>
+
+        <Section title="8. International processing">
+          <p>
+            Our providers may process data in India and other countries. By using
+            the Service, you understand that your information may be transferred
+            to and processed in locations that may have different data-protection
+            laws than your home jurisdiction.
+          </p>
+        </Section>
+
+        <Section title="9. Children">
+          <p>
+            The Service is intended for users aged 18 and older. We do not
+            knowingly collect personal information from children. If you believe
+            a minor has provided us data, contact us and we will take appropriate
+            steps to delete it.
+          </p>
+        </Section>
+
+        <Section title="10. Your choices and rights">
+          <p>
+            Depending on applicable law (including Indian information-technology
+            and consumer frameworks that may apply), you may have rights to
+            access, correct, or delete certain personal data, or to withdraw
+            consent where processing is consent-based. To exercise these rights,
+            email{" "}
+            <a
+              href="mailto:warrantyvault.in@gmail.com"
+              className="text-white/80 underline decoration-white/25 underline-offset-2"
+            >
+              warrantyvault.in@gmail.com
+            </a>
+            . We may need to verify your identity before responding.
+          </p>
+          <p>
+            You can stop reminder emails by adjusting preferences in the app
+            (where available) or by contacting support. Transactional messages
+            required for security (such as OTP codes) may still be sent when you
+            use those features.
+          </p>
+        </Section>
+
+        <Section title="11. Changes">
+          <p>
+            We may update this Privacy Policy periodically. We will post the
+            revised version with an updated &quot;Last updated&quot; date.
+            Material changes may be communicated by email or in-product notice
+            when appropriate.
+          </p>
+        </Section>
+
+        <Section title="12. Contact">
+          <p>
+            Privacy questions or requests:{" "}
+            <a
+              href="mailto:warrantyvault.in@gmail.com"
+              className="text-white/80 underline decoration-white/25 underline-offset-2"
+            >
+              warrantyvault.in@gmail.com
+            </a>
+            .
+          </p>
+        </Section>
+      </div>
+
+      <p className="mt-12 text-center text-sm text-white/40">
+        <Link href="/login" className="underline underline-offset-2 hover:text-white/70">
+          Back to log in
+        </Link>
+        <span className="mx-2 text-white/20">·</span>
+        <Link href="/terms" className="underline underline-offset-2 hover:text-white/70">
+          Terms of Service
+        </Link>
+      </p>
+    </AuthShell>
+  );
+}

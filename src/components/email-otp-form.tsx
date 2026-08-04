@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const inputClass =
-  "w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-cyan-400/60";
+import {
+  authInputClass,
+  authPrimaryButtonClass,
+} from "@/components/auth/auth-shell";
 
 type Props = {
   onBack?: () => void;
@@ -131,7 +133,10 @@ export default function EmailOtpForm({ onBack }: Props) {
     return (
       <form onSubmit={sendCode} className="space-y-4">
         <div>
-          <label htmlFor="otp-email" className="mb-1.5 block text-sm text-gray-400">
+          <label
+            htmlFor="otp-email"
+            className="mb-1.5 block text-xs text-white/50"
+          >
             Email
           </label>
           <input
@@ -143,31 +148,25 @@ export default function EmailOtpForm({ onBack }: Props) {
             placeholder="you@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
+            className={authInputClass}
           />
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-white/35">
             We’ll email a free 6-digit code. No password needed.
-          </p>
-          <p className="mt-1 text-xs text-amber-300/80">
-            Until a Resend domain is verified, live email OTP only works for your Resend account email.
           </p>
         </div>
 
         <button
           type="submit"
-          disabled={sending}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition hover:bg-gray-100 disabled:opacity-50"
+          disabled={sending || !email}
+          className={authPrimaryButtonClass}
         >
           {sending ? (
             <>
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={16} className="mr-2 animate-spin" />
               Sending code…
             </>
           ) : (
-            <>
-              Send code
-              <ArrowRight size={16} />
-            </>
+            "Send code"
           )}
         </button>
 
@@ -175,9 +174,9 @@ export default function EmailOtpForm({ onBack }: Props) {
           <button
             type="button"
             onClick={onBack}
-            className="w-full text-center text-sm text-gray-500 hover:text-white"
+            className="w-full text-center text-sm text-white/40 transition hover:text-white"
           >
-            Back to password sign-in
+            Back
           </button>
         )}
       </form>
@@ -187,7 +186,10 @@ export default function EmailOtpForm({ onBack }: Props) {
   return (
     <form onSubmit={verifyCode} className="space-y-4">
       <div>
-        <label htmlFor="otp-code" className="mb-1.5 block text-sm text-gray-400">
+        <label
+          htmlFor="otp-code"
+          className="mb-1.5 block text-xs text-white/50"
+        >
           Enter code sent to {email}
         </label>
         <input
@@ -199,11 +201,13 @@ export default function EmailOtpForm({ onBack }: Props) {
           maxLength={6}
           placeholder="6-digit code"
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          className={inputClass}
+          onChange={(e) =>
+            setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+          }
+          className={authInputClass}
         />
         {devHint && (
-          <p className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          <p className="mt-2 rounded-[10px] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
             {devHint}
           </p>
         )}
@@ -212,18 +216,15 @@ export default function EmailOtpForm({ onBack }: Props) {
       <button
         type="submit"
         disabled={verifying || code.length !== 6}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-semibold text-black transition hover:bg-gray-100 disabled:opacity-50"
+        className={authPrimaryButtonClass}
       >
         {verifying ? (
           <>
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2 size={16} className="mr-2 animate-spin" />
             Verifying…
           </>
         ) : (
-          <>
-            Verify & continue
-            <ArrowRight size={16} />
-          </>
+          "Verify & continue"
         )}
       </button>
 
@@ -235,7 +236,7 @@ export default function EmailOtpForm({ onBack }: Props) {
             setCode("");
             setDevHint(null);
           }}
-          className="text-gray-500 hover:text-white"
+          className="text-white/40 transition hover:text-white"
         >
           Change email
         </button>
@@ -245,11 +246,21 @@ export default function EmailOtpForm({ onBack }: Props) {
           onClick={() => {
             void resendCode();
           }}
-          className="text-cyan-300 hover:underline disabled:opacity-50"
+          className="text-white/70 underline decoration-white/30 underline-offset-2 hover:text-white disabled:opacity-50"
         >
           Resend code
         </button>
       </div>
+
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full text-center text-sm text-white/40 transition hover:text-white"
+        >
+          Back
+        </button>
+      )}
     </form>
   );
 }

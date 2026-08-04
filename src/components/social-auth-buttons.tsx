@@ -5,6 +5,8 @@ import { signIn } from "next-auth/react";
 import { Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 
+import { authSecondaryButtonClass } from "@/components/auth/auth-shell";
+
 type AuthProviders = {
   google: boolean;
   emailOtp: boolean;
@@ -15,11 +17,12 @@ type Props = {
   mode?: "signin" | "signup";
   onUseOtp?: () => void;
   showOtpShortcut?: boolean;
+  showOrDivider?: boolean;
 };
 
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
       <path
         fill="#EA4335"
         d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.8-5.5 3.8-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.2 14.5 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.8 0-.7-.1-1.2-.2-1.7H12z"
@@ -42,9 +45,9 @@ function GoogleIcon() {
 
 export default function SocialAuthButtons({
   callbackUrl = "/dashboard",
-  mode = "signin",
   onUseOtp,
   showOtpShortcut = true,
+  showOrDivider = true,
 }: Props) {
   const [providers, setProviders] = useState<AuthProviders | null>(null);
   const [busy, setBusy] = useState(false);
@@ -92,51 +95,62 @@ export default function SocialAuthButtons({
 
   if (!providers) {
     return (
-      <div className="flex items-center justify-center gap-2 py-3 text-sm text-gray-500">
+      <div className="flex items-center justify-center gap-2 py-3 text-sm text-white/40">
         <Loader2 size={14} className="animate-spin" />
-        Loading sign-in options…
+        Loading options…
       </div>
     );
   }
 
-  const hasSocial = providers.google;
+  const showOtp = showOtpShortcut && providers.emailOtp && Boolean(onUseOtp);
+  const hasAny = providers.google || showOtp;
 
-  if (!hasSocial && !(showOtpShortcut && providers.emailOtp && onUseOtp)) {
+  if (!hasAny) {
     return null;
   }
 
   return (
-    <div className="space-y-3">
-      {providers.google && (
-        <button
-          type="button"
-          onClick={() => void handleGoogle()}
-          disabled={busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-gray-100 disabled:opacity-50"
-        >
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <GoogleIcon />}
-          {mode === "signup" ? "Continue with Google" : "Sign in with Google"}
-        </button>
-      )}
+    <div className="space-y-5">
+      <div
+        className={`grid gap-2.5 ${
+          providers.google && showOtp ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+        }`}
+      >
+        {providers.google && (
+          <button
+            type="button"
+            onClick={() => void handleGoogle()}
+            disabled={busy}
+            className={authSecondaryButtonClass}
+          >
+            {busy ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <GoogleIcon />
+            )}
+            <span className="truncate">Continue with Google</span>
+          </button>
+        )}
 
-      {showOtpShortcut && providers.emailOtp && onUseOtp && (
-        <button
-          type="button"
-          onClick={onUseOtp}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-gray-200 transition hover:border-cyan-400/40 hover:text-cyan-200"
-        >
-          <Mail size={16} />
-          Use email one-time code
-        </button>
-      )}
+        {showOtp && (
+          <button
+            type="button"
+            onClick={onUseOtp}
+            className={authSecondaryButtonClass}
+          >
+            <Mail size={16} className="shrink-0 text-white/70" />
+            <span className="truncate">Continue with Email OTP</span>
+          </button>
+        )}
+      </div>
 
-      {(hasSocial || (showOtpShortcut && providers.emailOtp && onUseOtp)) && (
-        <div className="relative py-1">
+      {showOrDivider && hasAny && (
+        <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-white/10" />
           </div>
-          <div className="relative flex justify-center text-xs uppercase tracking-wide">
-            <span className="bg-neutral-950 px-3 text-gray-500">or continue with email</span>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-[#050505] px-3 text-white/35">or</span>
           </div>
         </div>
       )}
