@@ -1,21 +1,14 @@
-import { NextResponse } from "next/server";
-
+import { jsonError, jsonSuccess } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/product-access";
-import { syncInAppNotifications } from "@/lib/notifications";
 
 export async function GET() {
   try {
     const user = await getSessionUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return jsonError("Unauthorized", 401);
     }
-
-    await syncInAppNotifications(user.id);
 
     const notifications = await prisma.notificationLog.findMany({
       where: {
@@ -38,13 +31,10 @@ export async function GET() {
       take: 50,
     });
 
-    return NextResponse.json({ notifications });
+    return jsonSuccess({ notifications });
   } catch (error) {
     console.error("NOTIFICATIONS_GET_ERROR", error);
-    return NextResponse.json(
-      { error: "Failed to load notifications" },
-      { status: 500 }
-    );
+    return jsonError("Failed to load notifications");
   }
 }
 
@@ -53,10 +43,7 @@ export async function PATCH(req: Request) {
     const user = await getSessionUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return jsonError("Unauthorized", 401);
     }
 
     const body = await req.json();
@@ -73,14 +60,11 @@ export async function PATCH(req: Request) {
         },
       });
 
-      return NextResponse.json({ success: true });
+      return jsonSuccess({ success: true });
     }
 
     if (!body.id || typeof body.id !== "string") {
-      return NextResponse.json(
-        { error: "Notification id is required" },
-        { status: 400 }
-      );
+      return jsonError("Notification id is required", 400);
     }
 
     const existing = await prisma.notificationLog.findFirst({
@@ -91,10 +75,7 @@ export async function PATCH(req: Request) {
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Notification not found" },
-        { status: 404 }
-      );
+      return jsonError("Notification not found", 404);
     }
 
     await prisma.notificationLog.update({
@@ -102,12 +83,9 @@ export async function PATCH(req: Request) {
       data: { readAt: new Date() },
     });
 
-    return NextResponse.json({ success: true });
+    return jsonSuccess({ success: true });
   } catch (error) {
     console.error("NOTIFICATIONS_PATCH_ERROR", error);
-    return NextResponse.json(
-      { error: "Failed to update notification" },
-      { status: 500 }
-    );
+    return jsonError("Failed to update notification");
   }
 }
