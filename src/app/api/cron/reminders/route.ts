@@ -3,7 +3,12 @@ import { NextRequest } from "next/server";
 
 import { jsonError, jsonSuccess } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { sendReminderEmail } from "@/lib/email";
+import {
+  EmailSendError,
+  friendlyEmailError,
+  getEmailProviderStatus,
+  sendReminderEmail,
+} from "@/lib/email";
 import {
   getReminderPeriodKey,
   getReminderTypes,
@@ -69,13 +74,21 @@ export async function GET(req: NextRequest) {
     }
 
     const { in30 } = getReminderWindowDates();
+    const emailStatus = getEmailProviderStatus();
     let cursor: string | undefined;
     let emailsSent = 0;
     let inAppCreated = 0;
     let skipped = 0;
     let processed = 0;
+    let quotaStopped = false;
+    let emailErrors = 0;
+    let lastEmailError: string | null = null;
 
     for (;;) {
+      if (quotaStopped) {
+        break;
+      }
+
       const products = await prisma.product.findMany({
         where: {
           OR: [
@@ -119,6 +132,10 @@ export async function GET(req: NextRequest) {
       const inAppData: Prisma.NotificationLogCreateManyInput[] = [];
 
       for (const product of products) {
+        if (quotaStopped) {
+          break;
+        }
+
         const types = getReminderTypes(product);
 
         for (const type of types) {
@@ -143,32 +160,50 @@ export async function GET(req: NextRequest) {
             continue;
           }
 
-          const result = await sendReminderEmail({
-            to: product.user.email,
-            userName: product.user.name,
-            productName: product.name,
-            brand: product.brand,
-            type,
-            expiryDate: product.warrantyExpiry,
-            renewalNotes: product.renewalNotes,
-          });
+          try {
+            const result = await sendReminderEmail({
+              to: product.user.email,
+              userName: product.user.name,
+              productName: product.name,
+              brand: product.brand,
+              type,
+              expiryDate: product.warrantyExpiry,
+              renewalNotes: product.renewalNotes,
+            });
 
-          if (result.skipped) {
-            skipped += 1;
-            continue;
-          }
+            if (result.skipped) {
+              if (result.reason === "quota") {
+                quotaStopped = true;
+                lastEmailError = friendlyEmailError(
+                  new EmailSendError("quota", "quota")
+                );
+                break;
+              }
+              skipped += 1;
+              continue;
+            }
 
-          const createdEmail = await createEmailNotification({
-            userId: product.userId,
-            productId: product.id,
-            type,
-            periodKey,
-          });
+            const createdEmail = await createEmailNotification({
+              userId: product.userId,
+              productId: product.id,
+              type,
+              periodKey,
+            });
 
-          if (createdEmail) {
-            emailsSent += 1;
-          } else {
-            skipped += 1;
+            if (createdEmail) {
+              emailsSent += 1;
+            } else {
+              skipped += 1;
+            }
+          } catch (error) {
+            emailErrors += 1;
+            lastEmailError = friendlyEmailError(error);
+            console.error("CRON_REMINDER_EMAIL_ERROR", error);
+
+            if (error instanceof EmailSendError && error.kind === "quota") {
+              quotaStopped = true;
+              break;
+            }
           }
         }
       }
@@ -192,9 +227,18 @@ export async function GET(req: NextRequest) {
       emailsSent,
       inAppCreated,
       skipped,
+      quotaStopped,
+      emailErrors,
+      lastEmailError,
+      emailSetup: {
+        domainReady: emailStatus.domainReady,
+        usingSharedSender: emailStatus.usingSharedSender,
+        from: emailStatus.from,
+        dailyLimit: emailStatus.dailyLimit,
+      },
     });
   } catch (error) {
     console.error("CRON_REMINDERS_ERROR", error);
-    return jsonError("Failed to process reminders");
+    return jsonError(friendlyEmailError(error));
   }
 }

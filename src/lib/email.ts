@@ -1,11 +1,42 @@
 import { Resend } from "resend";
 
+import { consumeRateLimit } from "@/lib/rate-limit";
+
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const DEFAULT_FROM = "Warranty Vault <onboarding@resend.dev>";
+const DEFAULT_FROM = "Warranty Vault <noreply@warrantyvault.in>";
 const DEFAULT_REPLY_TO = "warrantyvault.in@gmail.com";
+const DEFAULT_DOMAIN_FROM = "Warranty Vault <noreply@warrantyvault.in>";
+
+/** Resend free tier is 100/day — keep a small buffer for OTP + tests. */
+export const RESEND_FREE_DAILY_LIMIT = 95;
+
+export type EmailErrorKind =
+  | "quota"
+  | "domain"
+  | "test_recipient"
+  | "config"
+  | "unknown";
+
+export class EmailSendError extends Error {
+  kind: EmailErrorKind;
+  statusCode?: number;
+  code?: string;
+
+  constructor(
+    message: string,
+    kind: EmailErrorKind = "unknown",
+    extras?: { statusCode?: number; code?: string }
+  ) {
+    super(message);
+    this.name = "EmailSendError";
+    this.kind = kind;
+    this.statusCode = extras?.statusCode;
+    this.code = extras?.code;
+  }
+}
 
 type ReminderEmailInput = {
   to: string;
@@ -30,6 +61,136 @@ function getFrom() {
 
 function getReplyTo() {
   return process.env.RESEND_REPLY_TO || DEFAULT_REPLY_TO;
+}
+
+export function isUsingSharedTestSender() {
+  const from = getFrom().toLowerCase();
+  return from.includes("onboarding@resend.dev") || from.includes("@resend.dev");
+}
+
+export function getResendTestRecipient() {
+  return (
+    process.env.RESEND_TEST_RECIPIENT ||
+    process.env.RESEND_REPLY_TO ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+export function getEmailProviderStatus() {
+  const configured = Boolean(process.env.RESEND_API_KEY);
+  const usingSharedSender = isUsingSharedTestSender();
+  const domainReady = configured && !usingSharedSender;
+
+  return {
+    configured,
+    usingSharedSender,
+    domainReady,
+    from: getFrom(),
+    replyTo: getReplyTo(),
+    recommendedFrom: DEFAULT_DOMAIN_FROM,
+    dailyLimit: RESEND_FREE_DAILY_LIMIT,
+    testRecipient: getResendTestRecipient() || null,
+  };
+}
+
+function utcDayKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+export function reserveDailyEmailSlot() {
+  const limit = Number(process.env.RESEND_DAILY_LIMIT || RESEND_FREE_DAILY_LIMIT);
+  const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : RESEND_FREE_DAILY_LIMIT;
+
+  return consumeRateLimit({
+    key: `resend:daily:${utcDayKey()}`,
+    limit: safeLimit,
+    windowMs: 24 * 60 * 60 * 1000,
+  });
+}
+
+export function classifyResendError(error: unknown): EmailErrorKind {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase();
+
+  if (
+    message.includes("too many requests") ||
+    message.includes("rate limit") ||
+    message.includes("quota") ||
+    message.includes("daily") ||
+    message.includes("monthly")
+  ) {
+    return "quota";
+  }
+
+  if (
+    message.includes("only send testing emails") ||
+    message.includes("own email address") ||
+    message.includes("please use our testing email address") ||
+    message.includes("invalid `to` field") ||
+    message.includes("invalid 'to' field")
+  ) {
+    return "test_recipient";
+  }
+
+  if (
+    message.includes("verify a domain") ||
+    message.includes("domain is not verified") ||
+    message.includes("from domain") ||
+    message.includes("not authorized to send")
+  ) {
+    return "domain";
+  }
+
+  return "unknown";
+}
+
+export function isResendTestRecipientRestriction(error: unknown) {
+  return classifyResendError(error) === "test_recipient";
+}
+
+export function isResendQuotaError(error: unknown) {
+  return classifyResendError(error) === "quota";
+}
+
+export function friendlyEmailError(error: unknown) {
+  if (error instanceof EmailSendError) {
+    if (error.kind === "quota") {
+      return "Email daily limit reached (Resend free tier ~100/day). Try again tomorrow.";
+    }
+    if (error.kind === "domain") {
+      return "Email domain is not verified in Resend yet. Verify warrantyvault.in and set RESEND_FROM_EMAIL to noreply@warrantyvault.in.";
+    }
+    if (error.kind === "test_recipient") {
+      const allowed = getResendTestRecipient();
+      return allowed
+        ? `Until your domain is verified, emails can only be sent to ${allowed}.`
+        : "Until your domain is verified, Resend can only email your account owner address.";
+    }
+    if (error.kind === "config") {
+      return "Email is not configured. Set RESEND_API_KEY.";
+    }
+    return error.message;
+  }
+
+  const kind = classifyResendError(error);
+  if (kind === "quota") {
+    return "Email daily limit reached (Resend free tier ~100/day). Try again tomorrow.";
+  }
+  if (kind === "domain") {
+    return "Email domain is not verified in Resend yet. Verify warrantyvault.in and set RESEND_FROM_EMAIL to noreply@warrantyvault.in.";
+  }
+  if (kind === "test_recipient") {
+    const allowed = getResendTestRecipient();
+    return allowed
+      ? `Until your domain is verified, emails can only be sent to ${allowed}.`
+      : "Until your domain is verified, Resend can only email your account owner address.";
+  }
+
+  return error instanceof Error && error.message
+    ? error.message
+    : "Failed to send email";
 }
 
 function buildBody(input: ReminderEmailInput) {
@@ -75,57 +236,95 @@ function buildTestBody() {
   `;
 }
 
-export async function sendReminderEmail(input: ReminderEmailInput) {
+async function sendViaResend(params: {
+  to: string;
+  subject: string;
+  html: string;
+}) {
   if (!resend) {
-    console.warn("RESEND_API_KEY missing — skipping email send");
-    return { skipped: true as const };
+    throw new EmailSendError(
+      "RESEND_API_KEY is not configured",
+      "config"
+    );
+  }
+
+  const quota = reserveDailyEmailSlot();
+  if (!quota.success) {
+    throw new EmailSendError(
+      "Resend free daily email limit reached",
+      "quota",
+      { statusCode: 429 }
+    );
   }
 
   const result = await resend.emails.send({
     from: getFrom(),
     replyTo: getReplyTo(),
-    to: input.to,
-    subject: SUBJECTS[input.type] ?? "Warranty reminder",
-    html: buildBody(input),
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
   });
 
   if (result.error) {
-    throw new Error(result.error.message);
+    const message = result.error.message || "Failed to send email";
+    const kind = classifyResendError(message);
+    throw new EmailSendError(message, kind, {
+      code: result.error.name,
+      statusCode:
+        typeof (result.error as { statusCode?: number }).statusCode === "number"
+          ? (result.error as { statusCode?: number }).statusCode
+          : undefined,
+    });
   }
 
-  return { skipped: false as const };
+  return {
+    id: result.data?.id ?? null,
+  };
+}
+
+export async function sendReminderEmail(input: ReminderEmailInput) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY missing — skipping email send");
+    return { skipped: true as const, reason: "config" as const };
+  }
+
+  try {
+    await sendViaResend({
+      to: input.to,
+      subject: SUBJECTS[input.type] ?? "Warranty reminder",
+      html: buildBody(input),
+    });
+    return { skipped: false as const };
+  } catch (error) {
+    if (error instanceof EmailSendError && error.kind === "quota") {
+      return { skipped: true as const, reason: "quota" as const };
+    }
+    throw error;
+  }
 }
 
 export async function sendTestEmail(to: string) {
   if (!resend) {
     console.warn("RESEND_API_KEY missing — skipping email send");
-    return { skipped: true as const, id: null };
+    return { skipped: true as const, id: null, reason: "config" as const };
   }
 
-  const result = await resend.emails.send({
-    from: getFrom(),
-    replyTo: getReplyTo(),
+  const result = await sendViaResend({
     to,
     subject: "Warranty Vault — test email",
     html: buildTestBody(),
   });
 
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
-
-  return { skipped: false as const, id: result.data?.id ?? null };
+  return { skipped: false as const, id: result.id };
 }
 
 export async function sendOtpEmail(to: string, code: string) {
   if (!resend) {
     console.warn("RESEND_API_KEY missing — skipping OTP email");
-    return { skipped: true as const };
+    return { skipped: true as const, reason: "config" as const };
   }
 
-  const result = await resend.emails.send({
-    from: getFrom(),
-    replyTo: getReplyTo(),
+  await sendViaResend({
     to,
     subject: "Your Warranty Vault sign-in code",
     html: `
@@ -138,43 +337,5 @@ export async function sendOtpEmail(to: string, code: string) {
     `,
   });
 
-  if (result.error) {
-    const message = result.error.message || "Failed to send OTP email";
-    const error = new Error(message) as Error & {
-      code?: string;
-      statusCode?: number;
-    };
-    error.code = result.error.name;
-    error.statusCode =
-      typeof (result.error as { statusCode?: number }).statusCode === "number"
-        ? (result.error as { statusCode?: number }).statusCode
-        : undefined;
-    throw error;
-  }
-
   return { skipped: false as const };
-}
-
-export function isResendTestRecipientRestriction(error: unknown) {
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase();
-
-  return (
-    message.includes("only send testing emails") ||
-    message.includes("verify a domain") ||
-    message.includes("own email address") ||
-    message.includes("please use our testing email address") ||
-    message.includes("invalid `to` field") ||
-    message.includes("invalid 'to' field")
-  );
-}
-
-export function getResendTestRecipient() {
-  return (
-    process.env.RESEND_TEST_RECIPIENT ||
-    process.env.RESEND_REPLY_TO ||
-    ""
-  )
-    .trim()
-    .toLowerCase();
 }

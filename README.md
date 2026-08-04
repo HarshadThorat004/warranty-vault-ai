@@ -114,31 +114,53 @@ http://localhost:3000
 
 ---
 
-# Email notifications (Resend)
+# Email notifications (Resend free tier)
 
-Warranty reminders are sent via [Resend](https://resend.com). Set these in `.env` (local) and Vercel (production):
+OTP codes and warranty reminders are sent via [Resend](https://resend.com).
+
+## Free tier limits
+
+| Limit | Value |
+|-------|-------|
+| Cost | $0 |
+| Emails / day | ~100 (app reserves 95 by default) |
+| Emails / month | ~3,000 |
+| Domains | 1 verified domain |
+
+The app guards the daily cap and returns clear errors instead of failing silently.
+
+## Recommended free production setup
+
+1. Create a Resend account + API key
+2. Open [Resend Domains](https://resend.com/domains) and add `warrantyvault.in`
+3. Add the SPF / DKIM / DMARC DNS records Resend shows
+4. Wait until the domain status is **Verified**
+5. Set env (local + Vercel):
 
 ```bash
 RESEND_API_KEY=re_xxxxxxxx
-RESEND_FROM_EMAIL=Warranty Vault <onboarding@resend.dev>
+RESEND_FROM_EMAIL=Warranty Vault <noreply@warrantyvault.in>
 RESEND_REPLY_TO=warrantyvault.in@gmail.com
+RESEND_TEST_RECIPIENT=warrantyvault.in@gmail.com
+RESEND_DAILY_LIMIT=95
 CRON_SECRET=your-random-secret
 ```
 
 | Variable | Purpose |
 |----------|---------|
-| `RESEND_FROM_EMAIL` | Visible From address (must be a Resend-verified sender) |
-| `RESEND_REPLY_TO` | Where user replies go (your Warranty Vault Gmail) |
+| `RESEND_FROM_EMAIL` | Visible From address (must use a Resend-verified domain) |
+| `RESEND_REPLY_TO` | Where user replies go |
+| `RESEND_TEST_RECIPIENT` | Allowed recipient if you temporarily fall back to `onboarding@resend.dev` |
+| `RESEND_DAILY_LIMIT` | App-side buffer under Resend free daily quota (default 95) |
 | `CRON_SECRET` | Protects `/api/cron/reminders` and `/api/cron/test-email` |
 
-**Important:** Resend cannot send *from* `@gmail.com`. For production branding, verify your domain (e.g. `warrantyvault.in`) in the Resend dashboard (add SPF/DKIM DNS records), then set:
+**Important:** Resend cannot send *from* `@gmail.com`. Until the domain is verified, you may temporarily use:
 
 ```bash
-RESEND_FROM_EMAIL=Warranty Vault <noreply@warrantyvault.in>
-RESEND_REPLY_TO=warrantyvault.in@gmail.com
+RESEND_FROM_EMAIL=Warranty Vault <onboarding@resend.dev>
 ```
 
-Until the domain is verified, use `onboarding@resend.dev` for From. On the free tier, that sender can only deliver to the email on your Resend account.
+That shared sender can only deliver to your Resend account email. After domain verification, switch to `noreply@warrantyvault.in` so OTP/reminders work for any user.
 
 ### Test send (local)
 
@@ -146,11 +168,18 @@ Until the domain is verified, use `onboarding@resend.dev` for From. On the free 
 curl -X POST http://localhost:3000/api/cron/test-email \
   -H "Authorization: Bearer $CRON_SECRET" \
   -H "Content-Type: application/json" \
-  -d '{"to":"your-resend-account@email.com"}'
-# Use :3001 if another app already occupies :3000
+  -d '{"to":"warrantyvault.in@gmail.com"}'
 ```
 
 Daily production reminders run via [`vercel.json`](vercel.json) → `GET /api/cron/reminders`.
+
+Check email readiness anytime:
+
+```bash
+curl http://localhost:3000/api/auth/options
+```
+
+Look for `emailSetup.domainReady: true`.
 
 ---
 
@@ -177,7 +206,7 @@ GOOGLE_CLIENT_SECRET=xxxxx
 
 Uses your existing `RESEND_API_KEY`. Users get a 6-digit code that expires in 10 minutes. If the user does not exist yet, an account is created automatically (passwordless).
 
-No extra paid service required. Resend free tier is enough for development and early traffic.
+For any-inbox OTP in production, complete the domain verification steps above. Local/dev can still show a temporary code when Resend’s shared sender blocks the recipient.
 
 ## Required NextAuth env
 

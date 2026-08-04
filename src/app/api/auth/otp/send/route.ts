@@ -3,6 +3,9 @@ import { z } from "zod";
 import { getRequestIp, jsonError, jsonSuccess } from "@/lib/api";
 import { createEmailOtp, normalizeEmail } from "@/lib/auth-helpers";
 import {
+  EmailSendError,
+  friendlyEmailError,
+  getEmailProviderStatus,
   getResendTestRecipient,
   isResendTestRecipientRestriction,
   sendOtpEmail,
@@ -29,6 +32,7 @@ export async function POST(req: Request) {
 
     const email = normalizeEmail(parsed.data.email);
     const requestIp = getRequestIp(req);
+    const status = getEmailProviderStatus();
 
     const rateLimit = consumeRateLimit({
       key: `auth:otp-send:${requestIp}:${email}`,
@@ -40,7 +44,7 @@ export async function POST(req: Request) {
       return jsonError("Too many codes requested. Please try again later.", 429);
     }
 
-    if (!process.env.RESEND_API_KEY) {
+    if (!status.configured) {
       return jsonError("Email sign-in is not configured yet", 503);
     }
 
@@ -59,38 +63,50 @@ export async function POST(req: Request) {
         success: true,
         message: "Check your email for a 6-digit code",
         expiresInMinutes: 10,
+        domainReady: status.domainReady,
       });
     } catch (sendError) {
-      // Resend free tier (onboarding@resend.dev) can only email the account owner.
-      // In local development, still keep the OTP and return the code so login works.
+      // Shared Resend test sender can only email the account owner.
+      // In development, keep OTP and return the code so login still works.
       if (isResendTestRecipientRestriction(sendError)) {
         const allowed = getResendTestRecipient();
 
         if (process.env.NODE_ENV !== "production") {
           console.warn(
-            `[OTP DEV] Resend free-tier limit hit. Code for ${otp.email}: ${otp.code}`
+            `[OTP DEV] Resend free-tier recipient limit. Code for ${otp.email}: ${otp.code}`
           );
 
           return jsonSuccess({
             success: true,
             message:
               allowed && otp.email !== allowed
-                ? `Resend free tier can only email ${allowed}. Dev code shown below for testing.`
-                : "Email delivery limited on Resend free tier. Use the code shown below.",
+                ? `Resend free tier can only email ${allowed} until your domain is verified. Dev code shown below.`
+                : "Email delivery limited until domain verification. Use the code shown below.",
             expiresInMinutes: 10,
             devCode: otp.code,
             allowedRecipient: allowed || null,
+            domainReady: false,
           });
         }
 
         await prisma.emailOtp.deleteMany({ where: { email: otp.email } });
+        return jsonError(friendlyEmailError(sendError), 403, {
+          code: "resend_test_recipient",
+        });
+      }
 
-        return jsonError(
-          allowed
-            ? `OTP email can currently only be sent to ${allowed}. Verify a domain in Resend to enable any email address.`
-            : "OTP email is limited by Resend free tier. Verify a domain in Resend to enable email codes.",
-          403
-        );
+      if (sendError instanceof EmailSendError && sendError.kind === "quota") {
+        await prisma.emailOtp.deleteMany({ where: { email: otp.email } });
+        return jsonError(friendlyEmailError(sendError), 429, {
+          code: "resend_quota",
+        });
+      }
+
+      if (sendError instanceof EmailSendError && sendError.kind === "domain") {
+        await prisma.emailOtp.deleteMany({ where: { email: otp.email } });
+        return jsonError(friendlyEmailError(sendError), 503, {
+          code: "resend_domain",
+        });
       }
 
       throw sendError;
@@ -99,14 +115,11 @@ export async function POST(req: Request) {
     console.error("OTP_SEND_ERROR", error);
 
     if (createdEmail) {
-      await prisma.emailOtp.deleteMany({ where: { email: createdEmail } }).catch(() => undefined);
+      await prisma.emailOtp
+        .deleteMany({ where: { email: createdEmail } })
+        .catch(() => undefined);
     }
 
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "Could not send sign-in code";
-
-    return jsonError(message);
+    return jsonError(friendlyEmailError(error), 500);
   }
 }
