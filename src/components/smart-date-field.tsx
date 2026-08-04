@@ -72,6 +72,27 @@ export default function SmartDateField({
   error,
   hint,
 }: Props) {
+  return (
+    <SmartDateFieldInner
+      key={value || "empty"}
+      id={id}
+      value={value}
+      onChange={onChange}
+      onBlur={onBlur}
+      error={error}
+      hint={hint}
+    />
+  );
+}
+
+function SmartDateFieldInner({
+  id,
+  value = "",
+  onChange,
+  onBlur,
+  error,
+  hint,
+}: Props) {
   const autoId = useId();
   const fieldId = id ?? autoId;
   const parts = splitIso(value);
@@ -95,20 +116,6 @@ export default function SmartDateField({
   const monthRef = useRef<HTMLInputElement>(null);
   const yearRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const next = splitIso(value);
-    setDay(next.day);
-    setMonth(next.month);
-    setYear(next.year);
-    if (value) {
-      try {
-        setViewMonth(startOfMonth(parseISO(value)));
-      } catch {
-        // ignore
-      }
-    }
-  }, [value]);
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
