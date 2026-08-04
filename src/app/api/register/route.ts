@@ -1,39 +1,42 @@
-import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
+import { getRequestIp, jsonError, jsonSuccess } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { registerSchema } from "@/lib/validations/auth";
 
 export async function POST(req: Request) {
   try {
+    const requestIp = getRequestIp(req);
     const body = await req.json();
-
     const validatedFields = registerSchema.safeParse(body);
 
     if (!validatedFields.success) {
-      return NextResponse.json(
-        {
-          error: "Invalid fields",
-        },
-        { status: 400 }
-      );
+      return jsonError("Invalid fields", 400, {
+        details: validatedFields.error.flatten().fieldErrors,
+      });
     }
 
     const { name, email, password } = validatedFields.data;
+    const normalizedEmail = email.trim().toLowerCase();
+    const rateLimit = consumeRateLimit({
+      key: `register:${requestIp}:${normalizedEmail}`,
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return jsonError("Too many registration attempts. Please try again later.", 429);
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: {
-        email,
+        email: normalizedEmail,
       },
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        {
-          error: "User already exists",
-        },
-        { status: 409 }
-      );
+      return jsonError("User already exists", 409);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -41,25 +44,14 @@ export async function POST(req: Request) {
     await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
       },
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-      },
-      { status: 201 }
-    );
+    return jsonSuccess({ success: true }, 201);
   } catch (error) {
     console.error("REGISTER_ERROR", error);
-
-    return NextResponse.json(
-      {
-        error: "Something went wrong",
-      },
-      { status: 500 }
-    );
+    return jsonError("Something went wrong");
   }
 }

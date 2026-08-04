@@ -6,13 +6,20 @@ import { prisma } from "@/lib/prisma";
 export async function getSessionUser() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.email) {
+  const userId = session?.user?.id;
+  const email = session?.user?.email;
+
+  if (!userId && !email) {
     return null;
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-  });
+  const user = userId
+    ? await prisma.user.findUnique({
+        where: { id: userId },
+      })
+    : await prisma.user.findUnique({
+        where: { email: email! },
+      });
 
   return user;
 }
