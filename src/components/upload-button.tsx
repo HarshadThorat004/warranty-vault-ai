@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useUploadThing } from "@/lib/uploadthing";
 import { toast } from "sonner";
-import { FileImage, Loader2, Upload } from "lucide-react";
+import { FileImage, FileText, Loader2, Upload } from "lucide-react";
 
 type Props = {
-  onChange: (url: string) => void;
+  onChange: (url: string, fileType?: string) => void;
   label: string;
   description?: string;
   size?: "md" | "lg";
@@ -15,16 +15,16 @@ type Props = {
 export default function UploadButtonComponent({
   onChange,
   label,
-  description = "Image up to 8MB",
+  description = "Image or PDF up to 8MB",
   size = "md",
 }: Props) {
   const [isUploading, setIsUploading] = useState(false);
 
-  const { startUpload } = useUploadThing("imageUploader", {
+  const { startUpload } = useUploadThing("documentUploader", {
     onClientUploadComplete: (res) => {
       setIsUploading(false);
       if (res?.[0]?.ufsUrl) {
-        onChange(res[0].ufsUrl);
+        onChange(res[0].ufsUrl, res[0].type || undefined);
       }
     },
     onUploadError: (error) => {
@@ -38,13 +38,16 @@ export default function UploadButtonComponent({
     e.target.value = "";
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+    const isImage = file.type.startsWith("image/");
+    const isPdf = file.type === "application/pdf";
+
+    if (!isImage && !isPdf) {
+      toast.error("Please upload an image or PDF file");
       return;
     }
 
     if (file.size > 8 * 1024 * 1024) {
-      toast.error("Image must be 8MB or smaller");
+      toast.error("File must be 8MB or smaller");
       return;
     }
 
@@ -62,7 +65,7 @@ export default function UploadButtonComponent({
     >
       <input
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         className="sr-only"
         disabled={isUploading}
         onChange={handleFileChange}
@@ -90,6 +93,7 @@ export default function UploadButtonComponent({
         </p>
         <p className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-500">
           <FileImage size={12} />
+          <FileText size={12} />
           {description}
         </p>
       </div>

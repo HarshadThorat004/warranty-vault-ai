@@ -20,6 +20,10 @@ function getAllowedHosts() {
   ]);
 }
 
+function hostMatchesAllowed(host: string, allowed: string) {
+  return host === allowed || host.endsWith(`.${allowed}`);
+}
+
 export function isAllowedRemoteUrl(value: string) {
   try {
     const url = new URL(value);
@@ -30,7 +34,13 @@ export function isAllowedRemoteUrl(value: string) {
 
     const host = normalizeHost(url.hostname);
 
-    return getAllowedHosts().has(host);
+    for (const allowed of getAllowedHosts()) {
+      if (hostMatchesAllowed(host, allowed)) {
+        return true;
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }

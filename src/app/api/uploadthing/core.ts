@@ -7,8 +7,12 @@ import { authOptions } from "@/lib/auth";
 const f = createUploadthing();
 
 export const ourFileRouter = {
-  imageUploader: f({
+  documentUploader: f({
     image: {
+      maxFileSize: "8MB",
+      maxFileCount: 1,
+    },
+    pdf: {
       maxFileSize: "8MB",
       maxFileCount: 1,
     },
