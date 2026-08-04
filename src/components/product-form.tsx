@@ -7,7 +7,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
 import { z } from "zod";
 
 import UploadButtonComponent from "@/components/upload-button";
@@ -15,11 +15,19 @@ import SmartDateField from "@/components/smart-date-field";
 import { FormInput, FormLabel, FormTextarea } from "@/components/form-fields";
 import { computeExpiryFromPeriod } from "@/lib/warranty";
 
+const WARRANTY_PERIOD_OPTIONS = [
+  { months: 6, label: "6 months" },
+  { months: 12, label: "12 months / 1 year" },
+  { months: 18, label: "18 months / 1.5 years" },
+  { months: 24, label: "24 months / 2 years" },
+] as const;
+
 const formSchema = z
   .object({
     name: z.string().min(1, "Product name is required").max(200),
     brand: z.string().max(100).optional(),
     serialNumber: z.string().max(100).optional(),
+    invoiceNumber: z.string().max(100).optional(),
     purchaseDate: z.string().min(1, "Purchase date is required"),
     warrantyExpiry: z.string().min(1, "Warranty expiry is required"),
     notes: z.string().max(2000).optional(),
@@ -61,10 +69,11 @@ const formSchema = z
 
 type FormValues = z.infer<typeof formSchema>;
 
-type AiField =
+type ScanField =
   | "name"
   | "brand"
   | "serialNumber"
+  | "invoiceNumber"
   | "purchaseDate"
   | "warrantyExpiry";
 
@@ -95,12 +104,12 @@ function nonEmpty(value?: string | null) {
     : null;
 }
 
-function AiBadge({ show }: { show: boolean }) {
+function ScanBadge({ show }: { show: boolean }) {
   if (!show) return null;
   return (
     <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
       <Sparkles size={10} />
-      AI filled
+      Scanned
     </span>
   );
 }
@@ -119,12 +128,21 @@ export default function ProductForm({
   const [scanExtracted, setScanExtracted] = useState(false);
   const [scanDocType, setScanDocType] = useState<ScanDocType>("Invoice");
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
-  const [aiFilled, setAiFilled] = useState<Set<AiField>>(new Set());
+  const [scanPreviewType, setScanPreviewType] = useState<string>("image");
+  const [scanFilled, setScanFilled] = useState<Set<ScanField>>(new Set());
+  const [selectedPeriodMonths, setSelectedPeriodMonths] = useState<number | null>(
+    null
+  );
+  const [lightbox, setLightbox] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
 
   const {
     register,
     handleSubmit,
     setValue,
+    getValues,
     control,
     formState: { errors, isDirty },
   } = useForm<FormValues>({
@@ -133,6 +151,7 @@ export default function ProductForm({
       name: defaultValues?.name ?? "",
       brand: defaultValues?.brand ?? "",
       serialNumber: defaultValues?.serialNumber ?? "",
+      invoiceNumber: defaultValues?.invoiceNumber ?? "",
       purchaseDate:
         defaultValues?.purchaseDate || (mode === "create" ? todayIso() : ""),
       warrantyExpiry: defaultValues?.warrantyExpiry ?? "",
@@ -145,6 +164,10 @@ export default function ProductForm({
   const renewalAvailable = useWatch({
     control,
     name: "renewalAvailable",
+  });
+  const purchaseDateValue = useWatch({
+    control,
+    name: "purchaseDate",
   });
   const isFormDirty =
     isDirty || documents.length !== (defaultValues?.documents?.length ?? 0);
@@ -160,21 +183,86 @@ export default function ProductForm({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isFormDirty, loading]);
 
-  function markAiFilled(fields: AiField[]) {
-    setAiFilled((prev) => {
+  useEffect(() => {
+    if (!lightbox) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setLightbox(null);
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [lightbox]);
+
+  useEffect(() => {
+    if (!selectedPeriodMonths || !purchaseDateValue) return;
+
+    const expiry = computeExpiryFromPeriod(
+      purchaseDateValue,
+      selectedPeriodMonths
+    );
+
+    if (!expiry) return;
+
+    const current = getValues("warrantyExpiry");
+    if (current === expiry) return;
+
+    setValue("warrantyExpiry", expiry, { shouldDirty: true });
+  }, [purchaseDateValue, selectedPeriodMonths, getValues, setValue]);
+
+  function markScanFilled(fields: ScanField[]) {
+    setScanFilled((prev) => {
       const next = new Set(prev);
       fields.forEach((field) => next.add(field));
       return next;
     });
   }
 
-  function clearAiBadge(field: AiField) {
-    setAiFilled((prev) => {
+  function clearScanBadge(field: ScanField) {
+    setScanFilled((prev) => {
       if (!prev.has(field)) return prev;
       const next = new Set(prev);
       next.delete(field);
       return next;
     });
+  }
+
+  function applyWarrantyPeriod(months: number) {
+    const purchaseDate = getValues("purchaseDate");
+
+    if (!purchaseDate) {
+      toast.error("Set purchase date first");
+      return;
+    }
+
+    const expiry = computeExpiryFromPeriod(purchaseDate, months);
+
+    if (!expiry) {
+      toast.error("Could not calculate expiry from purchase date");
+      return;
+    }
+
+    setSelectedPeriodMonths(months);
+    setValue("warrantyExpiry", expiry, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    markScanFilled(["warrantyExpiry"]);
+  }
+
+  function nearestPeriodOption(months: number) {
+    const exact = WARRANTY_PERIOD_OPTIONS.find(
+      (option) => option.months === months
+    );
+    return exact?.months ?? months;
   }
 
   async function runOcr(imageUrl: string) {
@@ -195,7 +283,7 @@ export default function ProductForm({
         toast.error(
           typeof data.error === "string" && data.error
             ? data.error
-            : "Could not extract details. Enter them manually."
+            : "Sorry, unable to scan — enter manually."
         );
         return;
       }
@@ -204,11 +292,12 @@ export default function ProductForm({
         name?: string;
         brand?: string;
         serialNumber?: string;
+        invoiceNumber?: string;
         purchaseDate?: string;
         warrantyPeriod?: string | number;
       };
 
-      const filled: AiField[] = [];
+      const filled: ScanField[] = [];
 
       const name = nonEmpty(result.name);
       if (name) {
@@ -228,24 +317,36 @@ export default function ProductForm({
         filled.push("serialNumber");
       }
 
-      const purchaseDate = nonEmpty(result.purchaseDate);
-      if (purchaseDate) {
-        setValue("purchaseDate", purchaseDate, { shouldDirty: true });
+      const invoiceNumber = nonEmpty(result.invoiceNumber);
+      if (invoiceNumber) {
+        setValue("invoiceNumber", invoiceNumber, { shouldDirty: true });
+        filled.push("invoiceNumber");
+      }
+
+      const purchaseDate =
+        nonEmpty(result.purchaseDate) || nonEmpty(getValues("purchaseDate"));
+
+      if (nonEmpty(result.purchaseDate)) {
+        setValue("purchaseDate", result.purchaseDate!, { shouldDirty: true });
         filled.push("purchaseDate");
       }
 
       if (purchaseDate && result.warrantyPeriod) {
-        const expiry = computeExpiryFromPeriod(
-          purchaseDate,
-          result.warrantyPeriod
-        );
-        if (expiry) {
+        const periodMonths =
+          typeof result.warrantyPeriod === "number"
+            ? result.warrantyPeriod
+            : Number.parseInt(String(result.warrantyPeriod), 10);
+
+        const expiry = computeExpiryFromPeriod(purchaseDate, periodMonths);
+
+        if (expiry && !Number.isNaN(periodMonths) && periodMonths > 0) {
+          setSelectedPeriodMonths(nearestPeriodOption(periodMonths));
           setValue("warrantyExpiry", expiry, { shouldDirty: true });
           filled.push("warrantyExpiry");
         }
       }
 
-      markAiFilled(filled);
+      markScanFilled(filled);
       setScanExtracted(true);
 
       if (filled.length > 0) {
@@ -253,11 +354,11 @@ export default function ProductForm({
           `Filled ${filled.length} field${filled.length > 1 ? "s" : ""} — review and edit below`
         );
       } else {
-        toast.message("No clear fields found. Fill the form manually.");
+        toast.error("Sorry, unable to scan — enter manually.");
       }
     } catch (error) {
       console.error(error);
-      toast.error("OCR failed. You can still enter details manually.");
+      toast.error("Sorry, unable to scan — enter manually.");
     } finally {
       setScanning(false);
     }
@@ -266,13 +367,19 @@ export default function ProductForm({
   function addDocument(
     url: string,
     documentType: DocumentType["documentType"],
-    runScan = false
+    runScan = false,
+    mimeType?: string
   ) {
+    const fileType =
+      mimeType === "application/pdf" || url.toLowerCase().includes(".pdf")
+        ? "pdf"
+        : "image";
+
     setDocuments((prev) => [
       ...prev,
       {
         fileUrl: url,
-        fileType: "image",
+        fileType,
         documentType,
       },
     ]);
@@ -280,6 +387,7 @@ export default function ProductForm({
 
     if (runScan) {
       setScanPreviewUrl(url);
+      setScanPreviewType(fileType);
       runOcr(url);
     }
   }
@@ -292,6 +400,7 @@ export default function ProductForm({
         ...values,
         brand: values.brand || null,
         serialNumber: values.serialNumber || null,
+        invoiceNumber: values.invoiceNumber || null,
         notes: values.notes || null,
         renewalNotes: values.renewalNotes || null,
         renewalAvailable: values.renewalAvailable ?? false,
@@ -377,8 +486,8 @@ export default function ProductForm({
               ? "Upload Invoice to auto-fill"
               : "Upload Warranty Card to auto-fill"
           }
-          description="We'll extract available details — image up to 8MB"
-          onChange={(url) => addDocument(url, scanDocType, true)}
+          description="We'll extract available details — image or PDF up to 8MB"
+          onChange={(url, fileType) => addDocument(url, scanDocType, true, fileType)}
         />
 
         {scanPreviewUrl && (
@@ -399,13 +508,31 @@ export default function ProductForm({
                 </span>
               ) : null}
             </div>
-            <Image
-              src={scanPreviewUrl}
-              alt="Scanned document"
-              width={1200}
-              height={400}
-              className="h-40 w-full object-cover"
-            />
+            {scanPreviewType === "pdf" ? (
+              <div className="flex h-40 items-center justify-center gap-3 bg-black/60 px-4 text-sm text-gray-300">
+                <CheckCircle2 size={18} className="text-cyan-300" />
+                PDF uploaded — text extracted during scan
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  setLightbox({
+                    url: scanPreviewUrl,
+                    title: `Scanned ${scanDocType}`,
+                  })
+                }
+                className="block w-full cursor-zoom-in text-left"
+              >
+                <Image
+                  src={scanPreviewUrl}
+                  alt="Scanned document"
+                  width={1200}
+                  height={400}
+                  className="h-40 w-full object-cover transition hover:opacity-90"
+                />
+              </button>
+            )}
           </div>
         )}
 
@@ -432,14 +559,14 @@ export default function ProductForm({
             <FormLabel htmlFor="name" className="mb-0">
               Product Name
             </FormLabel>
-            <AiBadge show={aiFilled.has("name")} />
+            <ScanBadge show={scanFilled.has("name")} />
           </div>
           <FormInput
             id="name"
             placeholder="iPhone 15 Pro"
             error={errors.name?.message}
             {...register("name", {
-              onChange: () => clearAiBadge("name"),
+              onChange: () => clearScanBadge("name"),
             })}
           />
         </div>
@@ -447,17 +574,17 @@ export default function ProductForm({
         <div className="grid gap-6 md:grid-cols-2">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-1">
-              <FormLabel htmlFor="brand" optional className="mb-0">
-                Brand
+              <FormLabel htmlFor="invoiceNumber" optional className="mb-0">
+                Invoice Number
               </FormLabel>
-              <AiBadge show={aiFilled.has("brand")} />
+              <ScanBadge show={scanFilled.has("invoiceNumber")} />
             </div>
             <FormInput
-              id="brand"
-              placeholder="Apple"
-              error={errors.brand?.message}
-              {...register("brand", {
-                onChange: () => clearAiBadge("brand"),
+              id="invoiceNumber"
+              placeholder="INV-2024-001"
+              error={errors.invoiceNumber?.message}
+              {...register("invoiceNumber", {
+                onChange: () => clearScanBadge("invoiceNumber"),
               })}
             />
           </div>
@@ -466,17 +593,34 @@ export default function ProductForm({
               <FormLabel htmlFor="serialNumber" optional className="mb-0">
                 Serial Number
               </FormLabel>
-              <AiBadge show={aiFilled.has("serialNumber")} />
+              <ScanBadge show={scanFilled.has("serialNumber")} />
             </div>
             <FormInput
               id="serialNumber"
               placeholder="SN-123456"
               error={errors.serialNumber?.message}
               {...register("serialNumber", {
-                onChange: () => clearAiBadge("serialNumber"),
+                onChange: () => clearScanBadge("serialNumber"),
               })}
             />
           </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex flex-wrap items-center gap-1">
+            <FormLabel htmlFor="brand" optional className="mb-0">
+              Brand
+            </FormLabel>
+            <ScanBadge show={scanFilled.has("brand")} />
+          </div>
+          <FormInput
+            id="brand"
+            placeholder="Apple"
+            error={errors.brand?.message}
+            {...register("brand", {
+              onChange: () => clearScanBadge("brand"),
+            })}
+          />
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -485,7 +629,7 @@ export default function ProductForm({
               <FormLabel htmlFor="purchaseDate" className="mb-0">
                 Purchase Date
               </FormLabel>
-              <AiBadge show={aiFilled.has("purchaseDate")} />
+              <ScanBadge show={scanFilled.has("purchaseDate")} />
             </div>
             <Controller
               name="purchaseDate"
@@ -495,13 +639,13 @@ export default function ProductForm({
                   id="purchaseDate"
                   value={field.value}
                   onChange={(value) => {
-                    clearAiBadge("purchaseDate");
+                    clearScanBadge("purchaseDate");
                     field.onChange(value);
                   }}
                   onBlur={field.onBlur}
                   error={errors.purchaseDate?.message}
                   hint={
-                    mode === "create" && !aiFilled.has("purchaseDate")
+                    mode === "create" && !scanFilled.has("purchaseDate")
                       ? "Pre-filled with today — edit or keep it"
                       : undefined
                   }
@@ -514,7 +658,27 @@ export default function ProductForm({
               <FormLabel htmlFor="warrantyExpiry" className="mb-0">
                 Warranty Expiry
               </FormLabel>
-              <AiBadge show={aiFilled.has("warrantyExpiry")} />
+              <ScanBadge show={scanFilled.has("warrantyExpiry")} />
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {WARRANTY_PERIOD_OPTIONS.map((option) => {
+                const active = selectedPeriodMonths === option.months;
+
+                return (
+                  <button
+                    key={option.months}
+                    type="button"
+                    onClick={() => applyWarrantyPeriod(option.months)}
+                    className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                      active
+                        ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200"
+                        : "border-white/10 bg-black/40 text-gray-400 hover:border-white/20 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
             <Controller
               name="warrantyExpiry"
@@ -524,12 +688,13 @@ export default function ProductForm({
                   id="warrantyExpiry"
                   value={field.value}
                   onChange={(value) => {
-                    clearAiBadge("warrantyExpiry");
+                    clearScanBadge("warrantyExpiry");
+                    setSelectedPeriodMonths(null);
                     field.onChange(value);
                   }}
                   onBlur={field.onBlur}
                   error={errors.warrantyExpiry?.message}
-                  hint="Type DD / MM / YYYY or tap the calendar"
+                  hint="Pick a period above, or type DD / MM / YYYY"
                 />
               )}
             />
@@ -582,7 +747,7 @@ export default function ProductForm({
           <h2 className="text-lg font-semibold text-white">More documents</h2>
           <p className="mt-1 text-sm text-gray-500">
             Add extra invoices, warranty cards, or other files. These do not
-            re-run AI scanning.
+            re-run document scanning.
           </p>
         </div>
 
@@ -593,7 +758,7 @@ export default function ProductForm({
             </p>
             <UploadButtonComponent
               label="Add Invoice"
-              onChange={(url) => addDocument(url, "Invoice", false)}
+              onChange={(url, fileType) => addDocument(url, "Invoice", false, fileType)}
             />
           </div>
           <div>
@@ -602,7 +767,7 @@ export default function ProductForm({
             </p>
             <UploadButtonComponent
               label="Add Card"
-              onChange={(url) => addDocument(url, "Warranty Card", false)}
+              onChange={(url, fileType) => addDocument(url, "Warranty Card", false, fileType)}
             />
           </div>
           <div>
@@ -611,7 +776,7 @@ export default function ProductForm({
             </p>
             <UploadButtonComponent
               label="Add File"
-              onChange={(url) => addDocument(url, "Other", false)}
+              onChange={(url, fileType) => addDocument(url, "Other", false, fileType)}
             />
           </div>
         </div>
@@ -645,13 +810,35 @@ export default function ProductForm({
                     Remove
                   </button>
                 </div>
-                <Image
-                  src={doc.fileUrl}
-                  alt={doc.documentType}
-                  width={1200}
-                  height={800}
-                  className="h-48 w-full object-cover"
-                />
+                {doc.fileType === "pdf" ? (
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-48 items-center justify-center gap-2 bg-black/60 px-4 text-sm text-cyan-300 hover:underline"
+                  >
+                    Open PDF document
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLightbox({
+                        url: doc.fileUrl,
+                        title: doc.documentType,
+                      })
+                    }
+                    className="block w-full cursor-zoom-in text-left"
+                  >
+                    <Image
+                      src={doc.fileUrl}
+                      alt={doc.documentType}
+                      width={1200}
+                      height={800}
+                      className="h-48 w-full object-cover transition hover:opacity-90"
+                    />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -672,6 +859,40 @@ export default function ProductForm({
             ? "Add Product"
             : "Save Changes"}
       </button>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={lightbox.title}
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition hover:bg-white/10"
+            aria-label="Close image"
+          >
+            <X size={18} />
+          </button>
+          <div
+            className="relative max-h-[90vh] max-w-[95vw]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="mb-3 text-center text-sm text-gray-300">
+              {lightbox.title}
+            </p>
+            <Image
+              src={lightbox.url}
+              alt={lightbox.title}
+              width={1600}
+              height={1200}
+              className="max-h-[82vh] w-auto max-w-full rounded-xl object-contain"
+            />
+          </div>
+        </div>
+      )}
     </form>
   );
 }

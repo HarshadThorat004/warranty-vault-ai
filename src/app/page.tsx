@@ -148,8 +148,8 @@ export default function HomePage() {
             },
             {
               icon: <Sparkles size={18} />,
-              title: "AI scanning",
-              desc: "Upload a slip and auto-fill the details that are available.",
+              title: "Document scanning",
+              desc: "Upload an invoice or warranty card and auto-fill available fields.",
             },
           ].map((feature) => (
             <div
