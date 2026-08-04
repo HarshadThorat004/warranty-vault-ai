@@ -11,11 +11,26 @@ model User {
   id                String             @id @default(cuid())
   name              String?
   email             String             @unique
-  password          String
+  password          String?
   image             String?
   createdAt         DateTime           @default(now())
   products          Product[]
   notificationLogs  NotificationLog[]
+  emailOtps         EmailOtp[]
+}
+
+model EmailOtp {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, expiresAt])
+  @@index([email])
 }
 
 model Product {
@@ -34,6 +49,10 @@ model Product {
   documents          Document[]
   notificationLogs   NotificationLog[]
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([warrantyExpiry])
+  @@index([userId, warrantyExpiry])
 }
 
 model Document {
@@ -44,6 +63,8 @@ model Document {
   productId    String
   documentType String
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model NotificationLog {
@@ -52,10 +73,12 @@ model NotificationLog {
   productId String
   type      String
   channel   String
+  periodKey String
   sentAt    DateTime  @default(now())
   readAt    DateTime?
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, type, channel])
+  @@index([userId, channel, sentAt])
+  @@unique([productId, type, channel, periodKey])
 }
