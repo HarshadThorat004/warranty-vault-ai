@@ -13,6 +13,7 @@ import { z } from "zod";
 import UploadButtonComponent from "@/components/upload-button";
 import SmartDateField from "@/components/smart-date-field";
 import { FormInput, FormLabel, FormTextarea } from "@/components/form-fields";
+import PdfPlaceholder from "@/components/pdf-placeholder";
 import { computeExpiryFromPeriod } from "@/lib/warranty";
 
 const WARRANTY_PERIOD_OPTIONS = [
@@ -509,10 +510,10 @@ export default function ProductForm({
               ) : null}
             </div>
             {scanPreviewType === "pdf" ? (
-              <div className="flex h-40 items-center justify-center gap-3 bg-black/60 px-4 text-sm text-gray-300">
-                <CheckCircle2 size={18} className="text-cyan-300" />
-                PDF uploaded — text extracted during scan
-              </div>
+              <PdfPlaceholder
+                sizeClassName="h-40"
+                label="PDF uploaded — text extracted"
+              />
             ) : (
               <button
                 type="button"
@@ -815,9 +816,12 @@ export default function ProductForm({
                     href={doc.fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex h-48 items-center justify-center gap-2 bg-black/60 px-4 text-sm text-cyan-300 hover:underline"
+                    className="block transition hover:opacity-90"
                   >
-                    Open PDF document
+                    <PdfPlaceholder
+                      sizeClassName="h-48"
+                      label={doc.documentType}
+                    />
                   </a>
                 ) : (
                   <button
@@ -862,33 +866,38 @@ export default function ProductForm({
 
       {lightbox && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[100] flex flex-col bg-black/95"
           role="dialog"
           aria-modal="true"
           aria-label={lightbox.title}
           onClick={() => setLightbox(null)}
         >
-          <button
-            type="button"
-            onClick={() => setLightbox(null)}
-            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition hover:bg-white/10"
-            aria-label="Close image"
-          >
-            <X size={18} />
-          </button>
           <div
-            className="relative max-h-[90vh] max-w-[95vw]"
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/80 px-4 py-3 backdrop-blur-md"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="mb-3 text-center text-sm text-gray-300">
+            <p className="min-w-0 truncate text-sm font-medium text-white">
               {lightbox.title}
             </p>
+            <button
+              type="button"
+              onClick={() => setLightbox(null)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+              aria-label="Close image"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div
+            className="flex flex-1 items-center justify-center p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
             <Image
               src={lightbox.url}
               alt={lightbox.title}
               width={1600}
               height={1200}
-              className="max-h-[82vh] w-auto max-w-full rounded-xl object-contain"
+              className="max-h-[calc(100vh-5.5rem)] w-auto max-w-full rounded-xl object-contain"
             />
           </div>
         </div>

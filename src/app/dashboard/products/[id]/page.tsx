@@ -1,18 +1,20 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { FileText, Package, Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 
 import AIInsightsCard from "@/components/ai-insights-card";
 import DeleteProductButton from "@/components/delete-product-button";
 import DashboardShell from "@/components/dashboard-shell";
 import Breadcrumbs from "@/components/breadcrumbs";
+import ProductDocuments from "@/components/product-documents";
+import ProductHeroMedia from "@/components/product-hero-media";
 
 import { assertProductOwner } from "@/lib/product-access";
 import {
   getDaysRemaining,
   getProductThumbnail,
   isExpired,
+  productUsesPdfCover,
 } from "@/lib/warranty";
 import { EXPIRING_SOON_DAYS } from "@/constants/warranty";
 
@@ -61,6 +63,7 @@ export default async function ProductPage({ params }: Props) {
       : 0;
 
   const thumbnail = getProductThumbnail(product);
+  const pdfCover = productUsesPdfCover(product);
 
   const statusLabel = expired
     ? "Expired"
@@ -86,26 +89,31 @@ export default async function ProductPage({ params }: Props) {
           ]}
         />
 
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/80">
+        <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/80">
+          <Link
+            href="/dashboard"
+            aria-label="Close and return to dashboard"
+            className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/60 text-gray-300 backdrop-blur-sm transition hover:bg-white/10 hover:text-white md:right-6 md:top-6"
+          >
+            <X size={18} />
+          </Link>
+
           <div className="grid md:grid-cols-2">
             <div className="relative min-h-[260px] bg-black/40">
-              {thumbnail ? (
-                <Image
-                  src={thumbnail}
-                  alt={product.name}
-                  width={1200}
-                  height={900}
-                  priority
-                  className="h-full min-h-[260px] w-full object-cover"
-                />
-              ) : (
-                <div className="flex min-h-[260px] items-center justify-center text-gray-600">
-                  <Package size={40} />
-                </div>
-              )}
+              <ProductHeroMedia
+                thumbnail={thumbnail}
+                productName={product.name}
+                pdfCover={pdfCover}
+                documents={product.documents.map((doc) => ({
+                  id: doc.id,
+                  fileUrl: doc.fileUrl,
+                  fileType: doc.fileType,
+                  documentType: doc.documentType,
+                }))}
+              />
             </div>
 
-            <div className="flex flex-col justify-center p-6 md:p-8">
+            <div className="flex flex-col justify-center p-6 pt-14 md:p-8 md:pr-16 md:pt-8">
               <span
                 className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-medium ${statusClass}`}
               >
@@ -231,47 +239,14 @@ export default async function ProductPage({ params }: Props) {
             </span>
           </div>
 
-          {product.documents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center">
-              <FileText className="mx-auto text-gray-600" size={28} />
-              <p className="mt-3 text-sm font-medium text-gray-300">
-                No documents yet
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                Add files from the edit page.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {product.documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="overflow-hidden rounded-xl border border-white/10 bg-black/30"
-                >
-                  <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-                    <p className="text-sm font-medium text-white">
-                      {doc.documentType}
-                    </p>
-                    <a
-                      href={doc.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs font-medium text-cyan-300 hover:underline"
-                    >
-                      Open
-                    </a>
-                  </div>
-                  <Image
-                    src={doc.fileUrl}
-                    alt={doc.documentType}
-                    width={1200}
-                    height={900}
-                    className="h-48 w-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+          <ProductDocuments
+            documents={product.documents.map((doc) => ({
+              id: doc.id,
+              fileUrl: doc.fileUrl,
+              fileType: doc.fileType,
+              documentType: doc.documentType,
+            }))}
+          />
         </section>
 
         <AIInsightsCard
