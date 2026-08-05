@@ -12,6 +12,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Warranty Vault AI",
   description: "Track your product warranties easily",
+  icons: {
+    icon: [{ url: "/brand/favicon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/brand/logo-mark.svg" }],
+  },
 };
 
 export default function RootLayout({

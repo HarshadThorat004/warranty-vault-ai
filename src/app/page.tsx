@@ -5,12 +5,13 @@ import Link from "next/link";
 import {
   Menu,
   X,
-  ShieldCheck,
   FileText,
   Bell,
   Sparkles,
   ArrowRight,
 } from "lucide-react";
+
+import BrandLogo from "@/components/brand-logo";
 
 export default function HomePage() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -20,15 +21,11 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 md:px-8">
           <Link href="/" className="inline-flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400 text-black">
-              <ShieldCheck size={18} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Warranty Vault AI</p>
-              <p className="text-[11px] text-gray-500">
-                Your warranty. Our responsibility.
-              </p>
-            </div>
+            <BrandLogo
+              variant="full"
+              size="md"
+              tagline="Your warranty. Our responsibility."
+            />
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex">

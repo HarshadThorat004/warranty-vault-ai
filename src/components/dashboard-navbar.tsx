@@ -6,12 +6,12 @@ import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Plus,
-  ShieldCheck,
   LogOut,
   Menu,
   X,
 } from "lucide-react";
 
+import BrandLogo from "@/components/brand-logo";
 import NotificationPanel, {
   type NotificationItem,
 } from "@/components/notification-panel";
@@ -31,17 +31,11 @@ export default function DashboardNavbar({
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 md:px-8">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400 text-black">
-            <ShieldCheck size={18} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold tracking-tight text-white">
-              Warranty Vault AI
-            </p>
-            <p className="text-[11px] text-gray-500">
-              {name ? `Hi, ${name.split(" ")[0]}` : "Warranty manager"}
-            </p>
-          </div>
+          <BrandLogo
+            variant="full"
+            size="md"
+            tagline={name ? `Hi, ${name.split(" ")[0]}` : "Warranty manager"}
+          />
         </Link>
 
         <div className="hidden items-center gap-2 md:flex">

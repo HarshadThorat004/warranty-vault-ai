@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ChevronLeft, ShieldCheck } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+
+import BrandLogo from "@/components/brand-logo";
 
 export const authInputClass =
   "w-full rounded-[10px] border border-white/15 bg-transparent px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-white/35";
@@ -55,11 +57,8 @@ function AuthBackground() {
 
 export function AuthBrandMark({ className = "" }: { className?: string }) {
   return (
-    <div
-      className={`mx-auto flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/15 bg-black text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04)] ${className}`}
-      aria-hidden
-    >
-      <ShieldCheck size={20} strokeWidth={1.75} />
+    <div className={`mx-auto w-fit ${className}`.trim()} aria-hidden>
+      <BrandLogo variant="mark" size="md" />
     </div>
   );
 }
