@@ -14,6 +14,7 @@ export async function GET() {
       where: {
         userId: user.id,
         channel: "in_app",
+        dismissedAt: null,
       },
       include: {
         product: {
@@ -87,5 +88,62 @@ export async function PATCH(req: Request) {
   } catch (error) {
     console.error("NOTIFICATIONS_PATCH_ERROR", error);
     return jsonError("Failed to update notification");
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const user = await getSessionUser();
+
+    if (!user) {
+      return jsonError("Unauthorized", 401);
+    }
+
+    const body = await req.json().catch(() => ({}));
+
+    if (body.deleteAll) {
+      await prisma.notificationLog.updateMany({
+        where: {
+          userId: user.id,
+          channel: "in_app",
+          dismissedAt: null,
+        },
+        data: {
+          dismissedAt: new Date(),
+          readAt: new Date(),
+        },
+      });
+
+      return jsonSuccess({ success: true });
+    }
+
+    if (!body.id || typeof body.id !== "string") {
+      return jsonError("Notification id is required", 400);
+    }
+
+    const existing = await prisma.notificationLog.findFirst({
+      where: {
+        id: body.id,
+        userId: user.id,
+        channel: "in_app",
+      },
+    });
+
+    if (!existing) {
+      return jsonError("Notification not found", 404);
+    }
+
+    await prisma.notificationLog.update({
+      where: { id: body.id },
+      data: {
+        dismissedAt: new Date(),
+        readAt: existing.readAt ?? new Date(),
+      },
+    });
+
+    return jsonSuccess({ success: true });
+  } catch (error) {
+    console.error("NOTIFICATIONS_DELETE_ERROR", error);
+    return jsonError("Failed to delete notification");
   }
 }

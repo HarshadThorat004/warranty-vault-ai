@@ -75,9 +75,10 @@ model NotificationLog {
   type      String
   channel   String
   periodKey String
-  sentAt    DateTime  @default(now())
-  readAt    DateTime?
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sentAt      DateTime  @default(now())
+  readAt      DateTime?
+  dismissedAt DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([userId, channel, sentAt])

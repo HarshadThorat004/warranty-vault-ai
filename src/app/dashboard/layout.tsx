@@ -38,7 +38,7 @@ export default async function DashboardLayout({
   if (user) {
     await syncInAppNotifications(user.id);
     const logs = await prisma.notificationLog.findMany({
-      where: { userId: user.id, channel: "in_app" },
+      where: { userId: user.id, channel: "in_app", dismissedAt: null },
       include: {
         product: {
           select: {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export type NotificationItem = {
@@ -34,6 +34,7 @@ export default function NotificationPanel({ initialItems = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>(initialItems);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = items.filter((item) => !item.readAt).length;
@@ -110,6 +111,47 @@ export default function NotificationPanel({ initialItems = [] }: Props) {
     }
   }
 
+  async function deleteNotification(id: string) {
+    try {
+      setDeletingId(id);
+      const response = await fetch("/api/notifications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Notification deleted");
+    } catch {
+      toast.error("Could not delete notification");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function deleteAll() {
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteAll: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      setItems([]);
+      toast.success("All notifications deleted");
+    } catch {
+      toast.error("Could not delete notifications");
+    }
+  }
+
   async function toggleOpen() {
     const next = !open;
     setOpen(next);
@@ -139,16 +181,27 @@ export default function NotificationPanel({ initialItems = [] }: Props) {
         <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 shadow-2xl sm:w-96">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <h3 className="font-semibold text-white">Notifications</h3>
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={markAllRead}
-                className="flex items-center gap-1 text-xs text-cyan-300 transition hover:text-cyan-200"
-              >
-                <CheckCheck size={14} />
-                Mark all read
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllRead}
+                  className="flex items-center gap-1 text-xs text-cyan-300 transition hover:text-cyan-200"
+                >
+                  <CheckCheck size={14} />
+                  Mark all read
+                </button>
+              )}
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={deleteAll}
+                  className="text-xs text-gray-400 transition hover:text-red-300"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="max-h-80 overflow-y-auto">
@@ -163,31 +216,48 @@ export default function NotificationPanel({ initialItems = [] }: Props) {
               </div>
             ) : (
               items.map((item) => (
-                <Link
+                <div
                   key={item.id}
-                  href={`/dashboard/products/${item.product.id}`}
-                  onClick={() => {
-                    markRead(item.id);
-                    setOpen(false);
-                  }}
-                  className={`block border-b border-white/5 px-4 py-3 transition hover:bg-white/5 ${
+                  className={`flex items-start gap-2 border-b border-white/5 px-3 py-3 transition hover:bg-white/5 ${
                     !item.readAt ? "bg-cyan-500/5" : ""
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-white">
-                        {item.product.name}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {TYPE_LABELS[item.type] ?? item.type}
-                      </p>
+                  <Link
+                    href={`/dashboard/products/${item.product.id}`}
+                    onClick={() => {
+                      markRead(item.id);
+                      setOpen(false);
+                    }}
+                    className="min-w-0 flex-1"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">
+                          {item.product.name}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-400">
+                          {TYPE_LABELS[item.type] ?? item.type}
+                        </p>
+                      </div>
+                      {!item.readAt && (
+                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
+                      )}
                     </div>
-                    {!item.readAt && (
-                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => deleteNotification(item.id)}
+                    disabled={deletingId === item.id}
+                    className="mt-0.5 rounded-lg p-1.5 text-gray-500 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                    aria-label={`Delete notification for ${item.product.name}`}
+                  >
+                    {deletingId === item.id ? (
+                      <Loader2 className="animate-spin" size={14} />
+                    ) : (
+                      <Trash2 size={14} />
                     )}
-                  </div>
-                </Link>
+                  </button>
+                </div>
               ))
             )}
           </div>

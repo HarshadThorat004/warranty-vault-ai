@@ -30,6 +30,7 @@ export interface NotificationLog {
   channel: string;
   sentAt: Date;
   readAt: Date | null;
+  dismissedAt: Date | null;
   product?: {
     id: string;
     name: string;
