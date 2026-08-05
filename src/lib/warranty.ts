@@ -59,21 +59,52 @@ export function computeExpiryFromPeriod(
   return format(addMonths(new Date(purchaseDate), months), "yyyy-MM-dd");
 }
 
+export function isPdfAsset(url: string, fileType?: string | null) {
+  if (fileType?.toLowerCase() === "pdf") return true;
+  const lower = url.toLowerCase();
+  return lower.includes(".pdf") || lower.includes("application/pdf");
+}
+
 export function getProductThumbnail(product: {
   invoiceImage?: string | null;
-  documents?: { fileUrl: string; documentType: string }[];
+  documents?: {
+    fileUrl: string;
+    documentType: string;
+    fileType?: string | null;
+  }[];
 }) {
-  if (product.invoiceImage) {
+  const imageDocs = (product.documents ?? []).filter(
+    (doc) => !isPdfAsset(doc.fileUrl, doc.fileType)
+  );
+
+  if (product.invoiceImage && !isPdfAsset(product.invoiceImage)) {
     return product.invoiceImage;
   }
 
-  const invoice = product.documents?.find(
-    (doc) => doc.documentType === "Invoice"
-  );
-
+  const invoice = imageDocs.find((doc) => doc.documentType === "Invoice");
   if (invoice) {
     return invoice.fileUrl;
   }
 
-  return product.documents?.[0]?.fileUrl ?? null;
+  return imageDocs[0]?.fileUrl ?? null;
+}
+
+/** True when the product has documents but no displayable image thumbnail. */
+export function productUsesPdfCover(product: {
+  invoiceImage?: string | null;
+  documents?: {
+    fileUrl: string;
+    documentType: string;
+    fileType?: string | null;
+  }[];
+}) {
+  if (getProductThumbnail(product)) return false;
+
+  if (product.invoiceImage && isPdfAsset(product.invoiceImage)) {
+    return true;
+  }
+
+  return (product.documents ?? []).some((doc) =>
+    isPdfAsset(doc.fileUrl, doc.fileType)
+  );
 }

@@ -11,7 +11,9 @@ import {
   getProductThumbnail,
   isExpired,
   isExpiringSoon,
+  productUsesPdfCover,
 } from "@/lib/warranty";
+import PdfPlaceholder from "@/components/pdf-placeholder";
 
 type Props = {
   products: Product[];
@@ -113,6 +115,7 @@ export default function ProductSearch({ products }: Props) {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredProducts.map((product) => {
             const thumbnail = getProductThumbnail(product);
+            const pdfCover = productUsesPdfCover(product);
             const daysRemaining = product.warrantyExpiry
               ? getDaysRemaining(product.warrantyExpiry)
               : null;
@@ -137,7 +140,10 @@ export default function ProductSearch({ products }: Props) {
                       width={500}
                       height={280}
                       className="h-40 w-full object-cover"
+                      unoptimized
                     />
+                  ) : pdfCover ? (
+                    <PdfPlaceholder sizeClassName="h-40" />
                   ) : (
                     <div className="flex h-40 items-center justify-center bg-black/40 text-gray-600">
                       <Package size={32} />
