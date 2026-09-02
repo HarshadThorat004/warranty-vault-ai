@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     "pdf-parse",
     "tesseract.js",
     "sharp",
+    "pdf-lib",
+    "web-push",
   ],
   images: {
     remotePatterns: [

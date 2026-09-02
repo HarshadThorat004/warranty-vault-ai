@@ -9,9 +9,11 @@ import {
   getEmailProviderStatus,
   sendReminderEmail,
 } from "@/lib/email";
+import { reminderRecipients } from "@/lib/household";
+import { sendReminderPushes } from "@/lib/push-send";
+import { isPushConfigured } from "@/lib/push";
 import {
-  getReminderPeriodKey,
-  getReminderTypes,
+  getReminderHits,
   getReminderWindowDates,
   type ReminderType,
 } from "@/lib/reminders";
@@ -19,12 +21,14 @@ import {
 const BATCH_SIZE = 100;
 
 async function hasEmailNotification(params: {
+  userId: string;
   productId: string;
   type: ReminderType;
   periodKey: string;
 }) {
   const existing = await prisma.notificationLog.findFirst({
     where: {
+      userId: params.userId,
       productId: params.productId,
       type: params.type,
       channel: "email",
@@ -77,6 +81,7 @@ export async function GET(req: NextRequest) {
     const emailStatus = getEmailProviderStatus();
     let cursor: string | undefined;
     let emailsSent = 0;
+    let pushesSent = 0;
     let inAppCreated = 0;
     let skipped = 0;
     let processed = 0;
@@ -98,6 +103,11 @@ export async function GET(req: NextRequest) {
               },
             },
             {
+              extendedExpiry: {
+                lte: in30,
+              },
+            },
+            {
               renewalAvailable: true,
             },
           ],
@@ -108,6 +118,21 @@ export async function GET(req: NextRequest) {
               id: true,
               email: true,
               name: true,
+            },
+          },
+          household: {
+            select: {
+              members: {
+                select: {
+                  user: {
+                    select: {
+                      id: true,
+                      email: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -136,73 +161,121 @@ export async function GET(req: NextRequest) {
           break;
         }
 
-        const types = getReminderTypes(product);
+        const hits = getReminderHits(product);
+        const recipients = reminderRecipients(
+          product.user,
+          product.household?.members.map((member) => member.user)
+        );
 
-        for (const type of types) {
-          const periodKey = getReminderPeriodKey(type, product.warrantyExpiry);
-
-          inAppData.push({
-            userId: product.userId,
-            productId: product.id,
-            type,
-            channel: "in_app",
-            periodKey,
-          });
-
-          const alreadySent = await hasEmailNotification({
-            productId: product.id,
-            type,
-            periodKey,
-          });
-
-          if (alreadySent) {
-            skipped += 1;
-            continue;
+        for (const hit of hits) {
+          if (quotaStopped) {
+            break;
           }
 
-          try {
-            const result = await sendReminderEmail({
-              to: product.user.email,
-              userName: product.user.name,
-              productName: product.name,
-              brand: product.brand,
+          const { type, periodKey } = hit;
+
+          for (const recipient of recipients) {
+            inAppData.push({
+              userId: recipient.id,
+              productId: product.id,
               type,
-              expiryDate: product.warrantyExpiry,
-              renewalNotes: product.renewalNotes,
+              channel: "in_app",
+              periodKey,
             });
 
-            if (result.skipped) {
-              if (result.reason === "quota") {
-                quotaStopped = true;
-                lastEmailError = friendlyEmailError(
-                  new EmailSendError("quota", "quota")
-                );
-                break;
+            if (isPushConfigured()) {
+              const alreadyPushed = await prisma.notificationLog.findFirst({
+                where: {
+                  userId: recipient.id,
+                  productId: product.id,
+                  type,
+                  channel: "push",
+                  periodKey,
+                },
+                select: { id: true },
+              });
+
+              if (!alreadyPushed) {
+                const pushResult = await sendReminderPushes({
+                  userId: recipient.id,
+                  productId: product.id,
+                  productName: product.name,
+                  type,
+                  coverLabel: hit.coverLabel,
+                });
+
+                if (pushResult.sent > 0) {
+                  await prisma.notificationLog.create({
+                    data: {
+                      userId: recipient.id,
+                      productId: product.id,
+                      type,
+                      channel: "push",
+                      periodKey,
+                    },
+                  }).catch(() => undefined);
+                  pushesSent += pushResult.sent;
+                }
               }
-              skipped += 1;
-              continue;
             }
 
-            const createdEmail = await createEmailNotification({
-              userId: product.userId,
+            const alreadySent = await hasEmailNotification({
+              userId: recipient.id,
               productId: product.id,
               type,
               periodKey,
             });
 
-            if (createdEmail) {
-              emailsSent += 1;
-            } else {
+            if (alreadySent) {
               skipped += 1;
+              continue;
             }
-          } catch (error) {
-            emailErrors += 1;
-            lastEmailError = friendlyEmailError(error);
-            console.error("CRON_REMINDER_EMAIL_ERROR", error);
 
-            if (error instanceof EmailSendError && error.kind === "quota") {
-              quotaStopped = true;
-              break;
+            try {
+              const result = await sendReminderEmail({
+                to: recipient.email,
+                userName: recipient.name,
+                productName: product.name,
+                brand: product.brand,
+                type,
+                expiryDate: hit.expiry,
+                renewalNotes: product.renewalNotes,
+                coverLabel: hit.coverLabel,
+              });
+
+              if (result.skipped) {
+                if (result.reason === "quota") {
+                  quotaStopped = true;
+                  lastEmailError = friendlyEmailError(
+                    new EmailSendError("quota", "quota")
+                  );
+                  break;
+                }
+                skipped += 1;
+                continue;
+              }
+
+              const createdEmail = await createEmailNotification({
+                userId: recipient.id,
+                productId: product.id,
+                type,
+                periodKey,
+              });
+
+              if (createdEmail) {
+                emailsSent += 1;
+              } else {
+                skipped += 1;
+              }
+            } catch (error) {
+              emailErrors += 1;
+              lastEmailError = friendlyEmailError(error);
+              console.error("CRON_REMINDER_EMAIL_ERROR", error);
+
+              if (error instanceof EmailSendError && error.kind === "quota") {
+                quotaStopped = true;
+                break;
+              }
             }
           }
         }
@@ -225,6 +298,7 @@ export async function GET(req: NextRequest) {
       success: true,
       processed,
       emailsSent,
+      pushesSent,
       inAppCreated,
       skipped,
       quotaStopped,

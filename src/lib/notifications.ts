@@ -1,26 +1,33 @@
 import { Prisma } from "@prisma/client";
 
+import { getHouseholdIdForUser, vaultProductWhere } from "@/lib/household";
 import { prisma } from "@/lib/prisma";
-import {
-  getReminderPeriodKey,
-  getReminderTypes,
-  getReminderWindowDates,
-} from "@/lib/reminders";
+import { getReminderHits, getReminderWindowDates } from "@/lib/reminders";
 
 export async function syncInAppNotifications(userId: string) {
   const { in30 } = getReminderWindowDates();
+  const householdId = await getHouseholdIdForUser(userId);
 
   const products = await prisma.product.findMany({
     where: {
-      userId,
-      OR: [
+      AND: [
+        vaultProductWhere(userId, householdId),
         {
-          warrantyExpiry: {
-            lte: in30,
-          },
-        },
-        {
-          renewalAvailable: true,
+          OR: [
+            {
+              warrantyExpiry: {
+                lte: in30,
+              },
+            },
+            {
+              extendedExpiry: {
+                lte: in30,
+              },
+            },
+            {
+              renewalAvailable: true,
+            },
+          ],
         },
       ],
     },
@@ -28,6 +35,8 @@ export async function syncInAppNotifications(userId: string) {
       id: true,
       userId: true,
       warrantyExpiry: true,
+      extendedExpiry: true,
+      extendedType: true,
       renewalAvailable: true,
     },
   });
@@ -35,15 +44,13 @@ export async function syncInAppNotifications(userId: string) {
   const data: Prisma.NotificationLogCreateManyInput[] = [];
 
   for (const product of products) {
-    const types = getReminderTypes(product);
-
-    for (const type of types) {
+    for (const hit of getReminderHits(product)) {
       data.push({
         userId,
         productId: product.id,
-        type,
+        type: hit.type,
         channel: "in_app",
-        periodKey: getReminderPeriodKey(type, product.warrantyExpiry),
+        periodKey: hit.periodKey,
       });
     }
   }

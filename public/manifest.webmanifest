@@ -1,0 +1,17 @@
+{
+  "name": "Warranty Vault AI",
+  "short_name": "Warranty Vault",
+  "description": "Track warranties, invoices, and expiry reminders.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/brand/logo-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

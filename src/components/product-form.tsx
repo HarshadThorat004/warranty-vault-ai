@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -11,9 +11,14 @@ import { CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
 import { z } from "zod";
 
 import UploadButtonComponent from "@/components/upload-button";
+import DocumentCapture from "@/components/document-capture";
 import SmartDateField from "@/components/smart-date-field";
 import { FormInput, FormLabel, FormTextarea } from "@/components/form-fields";
 import PdfPlaceholder from "@/components/pdf-placeholder";
+import { PRODUCT_CATEGORIES, EXTENDED_COVER_TYPES } from "@/constants/catalog";
+import { canAutofillField, hasExtractedValue } from "@/lib/document-extract/apply-scan";
+import { mergeByDocumentType } from "@/lib/document-extract/merge-scan";
+import type { ExtractedDocumentFields, FieldConfidence } from "@/lib/document-extract/types";
 import { computeExpiryFromPeriod } from "@/lib/warranty";
 
 const WARRANTY_PERIOD_OPTIONS = [
@@ -27,10 +32,25 @@ const formSchema = z
   .object({
     name: z.string().min(1, "Product name is required").max(200),
     brand: z.string().max(100).optional(),
+    model: z.string().max(120).optional(),
+    category: z.string().max(40).optional(),
+    retailer: z.string().max(80).optional(),
     serialNumber: z.string().max(100).optional(),
     invoiceNumber: z.string().max(100).optional(),
+    purchaseAmount: z
+      .string()
+      .max(20)
+      .optional()
+      .refine(
+        (value) =>
+          !value ||
+          /^\d{1,10}(\.\d{1,2})?$/.test(value.replace(/,/g, "").trim()),
+        "Enter a valid amount"
+      ),
     purchaseDate: z.string().min(1, "Purchase date is required"),
     warrantyExpiry: z.string().min(1, "Warranty expiry is required"),
+    extendedExpiry: z.string().optional(),
+    extendedType: z.string().max(40).optional(),
     notes: z.string().max(2000).optional(),
     renewalAvailable: z.boolean().optional(),
     renewalNotes: z.string().max(500).optional(),
@@ -66,6 +86,23 @@ const formSchema = z
         path: ["warrantyExpiry"],
       });
     }
+
+    if (data.extendedExpiry) {
+      const extended = new Date(data.extendedExpiry);
+      if (Number.isNaN(extended.getTime())) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Invalid extended cover date",
+          path: ["extendedExpiry"],
+        });
+      } else if (!Number.isNaN(purchase.getTime()) && extended < purchase) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Extended cover must be on or after purchase date",
+          path: ["extendedExpiry"],
+        });
+      }
+    }
   });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -73,8 +110,12 @@ type FormValues = z.infer<typeof formSchema>;
 type ScanField =
   | "name"
   | "brand"
+  | "model"
+  | "category"
+  | "retailer"
   | "serialNumber"
   | "invoiceNumber"
+  | "purchaseAmount"
   | "purchaseDate"
   | "warrantyExpiry";
 
@@ -105,12 +146,27 @@ function nonEmpty(value?: string | null) {
     : null;
 }
 
-function ScanBadge({ show }: { show: boolean }) {
+function ScanBadge({
+  show,
+  confidence,
+}: {
+  show: boolean;
+  confidence?: FieldConfidence;
+}) {
   if (!show) return null;
+
+  const review = confidence === "medium" || confidence === "low";
+
   return (
-    <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+    <span
+      className={`ml-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        review
+          ? "border-amber-500/20 bg-amber-500/10 text-amber-200"
+          : "border-cyan-500/20 bg-cyan-500/10 text-cyan-300"
+      }`}
+    >
       <Sparkles size={10} />
-      Scanned
+      {review ? "Review" : "Scanned"}
     </span>
   );
 }
@@ -131,6 +187,11 @@ export default function ProductForm({
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [scanPreviewType, setScanPreviewType] = useState<string>("image");
   const [scanFilled, setScanFilled] = useState<Set<ScanField>>(new Set());
+  const [scanConfidence, setScanConfidence] = useState<
+    Partial<Record<ScanField, FieldConfidence>>
+  >({});
+  const userEdited = useRef<Set<ScanField>>(new Set());
+  const lastScan = useRef<ExtractedDocumentFields | null>(null);
   const [selectedPeriodMonths, setSelectedPeriodMonths] = useState<number | null>(
     null
   );
@@ -151,11 +212,17 @@ export default function ProductForm({
     defaultValues: {
       name: defaultValues?.name ?? "",
       brand: defaultValues?.brand ?? "",
+      model: defaultValues?.model ?? "",
+      category: defaultValues?.category ?? "",
+      retailer: defaultValues?.retailer ?? "",
       serialNumber: defaultValues?.serialNumber ?? "",
       invoiceNumber: defaultValues?.invoiceNumber ?? "",
+      purchaseAmount: defaultValues?.purchaseAmount ?? "",
       purchaseDate:
         defaultValues?.purchaseDate || (mode === "create" ? todayIso() : ""),
       warrantyExpiry: defaultValues?.warrantyExpiry ?? "",
+      extendedExpiry: defaultValues?.extendedExpiry ?? "",
+      extendedType: defaultValues?.extendedType || "store",
       notes: defaultValues?.notes ?? "",
       renewalAvailable: defaultValues?.renewalAvailable ?? false,
       renewalNotes: defaultValues?.renewalNotes ?? "",
@@ -169,6 +236,10 @@ export default function ProductForm({
   const purchaseDateValue = useWatch({
     control,
     name: "purchaseDate",
+  });
+  const categoryValue = useWatch({
+    control,
+    name: "category",
   });
   const isFormDirty =
     isDirty || documents.length !== (defaultValues?.documents?.length ?? 0);
@@ -236,6 +307,11 @@ export default function ProductForm({
     });
   }
 
+  function markUserEdited(field: ScanField) {
+    userEdited.current.add(field);
+    clearScanBadge(field);
+  }
+
   function applyWarrantyPeriod(months: number) {
     const purchaseDate = getValues("purchaseDate");
 
@@ -256,7 +332,7 @@ export default function ProductForm({
       shouldDirty: true,
       shouldValidate: true,
     });
-    markScanFilled(["warrantyExpiry"]);
+    markUserEdited("warrantyExpiry");
   }
 
   function nearestPeriodOption(months: number) {
@@ -266,16 +342,46 @@ export default function ProductForm({
     return exact?.months ?? months;
   }
 
-  async function runOcr(imageUrl: string) {
+  async function runOcr(
+    imageUrl: string,
+    file?: File,
+    documentType: ScanDocType = scanDocType
+  ) {
     try {
       setScanning(true);
       setScanExtracted(false);
       toast.message("Extracting details from document…");
 
+      let payload: { imageUrl?: string; text?: string; qrPayload?: string } = {
+        imageUrl,
+      };
+
+      if (file?.type.startsWith("image/")) {
+        try {
+          toast.message("Reading document on this device…");
+          const { recognizeDocumentImage } = await import(
+            "@/lib/document-extract/browser-ocr"
+          );
+          const local = await recognizeDocumentImage(file, (message) =>
+            toast.message(message)
+          );
+          if (local.text || local.qrPayload) {
+            payload = {
+              text: local.text,
+              qrPayload: local.qrPayload ?? "",
+            };
+          }
+        } catch (error) {
+          console.error(error);
+          toast.message("On-device read failed — trying server scan…");
+          payload = { imageUrl };
+        }
+      }
+
       const response = await fetch("/api/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -289,48 +395,75 @@ export default function ProductForm({
         return;
       }
 
-      const result = data.result as {
-        name?: string;
-        brand?: string;
-        serialNumber?: string;
-        invoiceNumber?: string;
-        purchaseDate?: string;
-        warrantyPeriod?: string | number;
-      };
+      let result = data.result as ExtractedDocumentFields;
+      if (lastScan.current) {
+        result = mergeByDocumentType(lastScan.current, result, documentType);
+      }
+      lastScan.current = result;
 
       const filled: ScanField[] = [];
+      const confidence: Partial<Record<ScanField, FieldConfidence>> = {};
 
-      const name = nonEmpty(result.name);
-      if (name) {
-        setValue("name", name, { shouldDirty: true });
-        filled.push("name");
-      }
+      const tryFill = (
+        field: ScanField,
+        value: string | null,
+        fieldConfidence?: FieldConfidence
+      ) => {
+        if (
+          !canAutofillField({
+            hasValue: hasExtractedValue(value),
+            userEdited: userEdited.current.has(field),
+            confidence: fieldConfidence,
+          })
+        ) {
+          return;
+        }
 
-      const brand = nonEmpty(result.brand);
-      if (brand) {
-        setValue("brand", brand, { shouldDirty: true });
-        filled.push("brand");
-      }
+        setValue(field, value as string, { shouldDirty: true });
+        filled.push(field);
+        if (fieldConfidence) confidence[field] = fieldConfidence;
+      };
 
-      const serialNumber = nonEmpty(result.serialNumber);
-      if (serialNumber) {
-        setValue("serialNumber", serialNumber, { shouldDirty: true });
-        filled.push("serialNumber");
-      }
+      tryFill("name", nonEmpty(result.name), result.fieldMeta?.name?.confidence);
+      tryFill("brand", nonEmpty(result.brand), result.fieldMeta?.brand?.confidence);
+      tryFill("model", nonEmpty(result.model), result.fieldMeta?.model?.confidence);
+      tryFill(
+        "category",
+        nonEmpty(result.category),
+        result.fieldMeta?.category?.confidence
+      );
+      tryFill(
+        "retailer",
+        nonEmpty(result.retailer),
+        result.fieldMeta?.retailer?.confidence
+      );
+      tryFill(
+        "serialNumber",
+        nonEmpty(result.serialNumber),
+        result.fieldMeta?.serialNumber?.confidence
+      );
+      tryFill(
+        "invoiceNumber",
+        nonEmpty(result.invoiceNumber),
+        result.fieldMeta?.invoiceNumber?.confidence
+      );
+      tryFill(
+        "purchaseAmount",
+        nonEmpty(result.purchaseAmount),
+        result.fieldMeta?.purchaseAmount?.confidence
+      );
 
-      const invoiceNumber = nonEmpty(result.invoiceNumber);
-      if (invoiceNumber) {
-        setValue("invoiceNumber", invoiceNumber, { shouldDirty: true });
-        filled.push("invoiceNumber");
-      }
+      const scannedPurchaseDate = nonEmpty(result.purchaseDate);
+      tryFill(
+        "purchaseDate",
+        scannedPurchaseDate,
+        result.fieldMeta?.purchaseDate?.confidence
+      );
 
       const purchaseDate =
-        nonEmpty(result.purchaseDate) || nonEmpty(getValues("purchaseDate"));
-
-      if (nonEmpty(result.purchaseDate)) {
-        setValue("purchaseDate", result.purchaseDate!, { shouldDirty: true });
-        filled.push("purchaseDate");
-      }
+        (userEdited.current.has("purchaseDate")
+          ? nonEmpty(getValues("purchaseDate"))
+          : scannedPurchaseDate) || nonEmpty(getValues("purchaseDate"));
 
       if (purchaseDate && result.warrantyPeriod) {
         const periodMonths =
@@ -339,15 +472,27 @@ export default function ProductForm({
             : Number.parseInt(String(result.warrantyPeriod), 10);
 
         const expiry = computeExpiryFromPeriod(purchaseDate, periodMonths);
+        const expiryConfidence = result.fieldMeta?.warrantyPeriod?.confidence;
 
-        if (expiry && !Number.isNaN(periodMonths) && periodMonths > 0) {
+        if (
+          expiry &&
+          !Number.isNaN(periodMonths) &&
+          periodMonths > 0 &&
+          canAutofillField({
+            hasValue: true,
+            userEdited: userEdited.current.has("warrantyExpiry"),
+            confidence: expiryConfidence,
+          })
+        ) {
           setSelectedPeriodMonths(nearestPeriodOption(periodMonths));
           setValue("warrantyExpiry", expiry, { shouldDirty: true });
           filled.push("warrantyExpiry");
+          if (expiryConfidence) confidence.warrantyExpiry = expiryConfidence;
         }
       }
 
       markScanFilled(filled);
+      setScanConfidence((prev) => ({ ...prev, ...confidence }));
       setScanExtracted(true);
 
       if (filled.length > 0) {
@@ -369,7 +514,8 @@ export default function ProductForm({
     url: string,
     documentType: DocumentType["documentType"],
     runScan = false,
-    mimeType?: string
+    mimeType?: string,
+    file?: File
   ) {
     const fileType =
       mimeType === "application/pdf" || url.toLowerCase().includes(".pdf")
@@ -386,10 +532,11 @@ export default function ProductForm({
     ]);
     toast.success(`${documentType} uploaded`);
 
-    if (runScan) {
+    if (runScan && documentType !== "Other") {
       setScanPreviewUrl(url);
       setScanPreviewType(fileType);
-      runOcr(url);
+      setScanDocType(documentType);
+      void runOcr(url, file, documentType);
     }
   }
 
@@ -400,8 +547,16 @@ export default function ProductForm({
       const body = {
         ...values,
         brand: values.brand || null,
+        model: values.model || null,
+        category: values.category || null,
+        retailer: values.retailer || null,
         serialNumber: values.serialNumber || null,
         invoiceNumber: values.invoiceNumber || null,
+        purchaseAmount: values.purchaseAmount?.replace(/,/g, "").trim() || null,
+        extendedExpiry: values.extendedExpiry || null,
+        extendedType: values.extendedExpiry
+          ? values.extendedType || "store"
+          : null,
         notes: values.notes || null,
         renewalNotes: values.renewalNotes || null,
         renewalAvailable: values.renewalAvailable ?? false,
@@ -458,8 +613,8 @@ export default function ProductForm({
         <div>
           <h2 className="text-lg font-semibold text-white">Scan document</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Upload an invoice or warranty card first. Only found fields will be
-            filled — you can edit anything.
+            Upload or photograph an invoice or warranty card. Text is read on
+            this device when possible. Scan both documents to fill more fields.
           </p>
         </div>
 
@@ -480,15 +635,17 @@ export default function ProductForm({
           ))}
         </div>
 
-        <UploadButtonComponent
+        <DocumentCapture
           size="lg"
           label={
             scanDocType === "Invoice"
-              ? "Upload Invoice to auto-fill"
-              : "Upload Warranty Card to auto-fill"
+              ? "Upload invoice to auto-fill"
+              : "Upload warranty card to auto-fill"
           }
-          description="We'll extract available details — image or PDF up to 8MB"
-          onChange={(url, fileType) => addDocument(url, scanDocType, true, fileType)}
+          description="Photo, image, or PDF up to 8MB — scanned on this device"
+          onUploaded={(url, fileType, file) =>
+            addDocument(url, scanDocType, true, fileType, file)
+          }
         />
 
         {scanPreviewUrl && (
@@ -560,14 +717,17 @@ export default function ProductForm({
             <FormLabel htmlFor="name" className="mb-0">
               Product Name
             </FormLabel>
-            <ScanBadge show={scanFilled.has("name")} />
+            <ScanBadge
+              show={scanFilled.has("name")}
+              confidence={scanConfidence.name}
+            />
           </div>
           <FormInput
             id="name"
             placeholder="iPhone 15 Pro"
             error={errors.name?.message}
             {...register("name", {
-              onChange: () => clearScanBadge("name"),
+              onChange: () => markUserEdited("name"),
             })}
           />
         </div>
@@ -578,30 +738,40 @@ export default function ProductForm({
               <FormLabel htmlFor="invoiceNumber" optional className="mb-0">
                 Invoice Number
               </FormLabel>
-              <ScanBadge show={scanFilled.has("invoiceNumber")} />
+              <ScanBadge
+                show={scanFilled.has("invoiceNumber")}
+                confidence={scanConfidence.invoiceNumber}
+              />
             </div>
             <FormInput
               id="invoiceNumber"
               placeholder="INV-2024-001"
               error={errors.invoiceNumber?.message}
               {...register("invoiceNumber", {
-                onChange: () => clearScanBadge("invoiceNumber"),
+                onChange: () => markUserEdited("invoiceNumber"),
               })}
             />
           </div>
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-1">
               <FormLabel htmlFor="serialNumber" optional className="mb-0">
-                Serial Number
+                {categoryValue === "phones" ? "IMEI / serial" : "Serial / IMEI"}
               </FormLabel>
-              <ScanBadge show={scanFilled.has("serialNumber")} />
+              <ScanBadge
+                show={scanFilled.has("serialNumber")}
+                confidence={scanConfidence.serialNumber}
+              />
             </div>
             <FormInput
               id="serialNumber"
-              placeholder="SN-123456"
+              placeholder={
+                categoryValue === "phones"
+                  ? "*#06# or Settings > About"
+                  : "From the box, rating plate, or card"
+              }
               error={errors.serialNumber?.message}
               {...register("serialNumber", {
-                onChange: () => clearScanBadge("serialNumber"),
+                onChange: () => markUserEdited("serialNumber"),
               })}
             />
           </div>
@@ -612,16 +782,113 @@ export default function ProductForm({
             <FormLabel htmlFor="brand" optional className="mb-0">
               Brand
             </FormLabel>
-            <ScanBadge show={scanFilled.has("brand")} />
+              <ScanBadge
+                show={scanFilled.has("brand")}
+                confidence={scanConfidence.brand}
+              />
           </div>
           <FormInput
             id="brand"
             placeholder="Apple"
             error={errors.brand?.message}
             {...register("brand", {
-              onChange: () => clearScanBadge("brand"),
+              onChange: () => markUserEdited("brand"),
             })}
           />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-1">
+              <FormLabel htmlFor="model" optional className="mb-0">
+                Model
+              </FormLabel>
+              <ScanBadge
+                show={scanFilled.has("model")}
+                confidence={scanConfidence.model}
+              />
+            </div>
+            <FormInput
+              id="model"
+              placeholder="WH-1000XM5"
+              error={errors.model?.message}
+              {...register("model", {
+                onChange: () => markUserEdited("model"),
+              })}
+            />
+          </div>
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-1">
+              <FormLabel htmlFor="category" optional className="mb-0">
+                Category
+              </FormLabel>
+              <ScanBadge
+                show={scanFilled.has("category")}
+                confidence={scanConfidence.category}
+              />
+            </div>
+            <select
+              id="category"
+              className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-white outline-none transition focus:border-cyan-400"
+              {...register("category", {
+                onChange: () => markUserEdited("category"),
+              })}
+            >
+              <option value="">Select category</option>
+              {PRODUCT_CATEGORIES.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+            {errors.category?.message && (
+              <p className="mt-1.5 text-sm text-red-400" role="alert">
+                {errors.category.message}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-1">
+              <FormLabel htmlFor="retailer" optional className="mb-0">
+                Retailer
+              </FormLabel>
+              <ScanBadge
+                show={scanFilled.has("retailer")}
+                confidence={scanConfidence.retailer}
+              />
+            </div>
+            <FormInput
+              id="retailer"
+              placeholder="Amazon, Croma, local store…"
+              error={errors.retailer?.message}
+              {...register("retailer", {
+                onChange: () => markUserEdited("retailer"),
+              })}
+            />
+          </div>
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-1">
+              <FormLabel htmlFor="purchaseAmount" optional className="mb-0">
+                Purchase amount (INR)
+              </FormLabel>
+              <ScanBadge
+                show={scanFilled.has("purchaseAmount")}
+                confidence={scanConfidence.purchaseAmount}
+              />
+            </div>
+            <FormInput
+              id="purchaseAmount"
+              inputMode="decimal"
+              placeholder="24990"
+              error={errors.purchaseAmount?.message}
+              {...register("purchaseAmount", {
+                onChange: () => markUserEdited("purchaseAmount"),
+              })}
+            />
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -630,7 +897,10 @@ export default function ProductForm({
               <FormLabel htmlFor="purchaseDate" className="mb-0">
                 Purchase Date
               </FormLabel>
-              <ScanBadge show={scanFilled.has("purchaseDate")} />
+              <ScanBadge
+                show={scanFilled.has("purchaseDate")}
+                confidence={scanConfidence.purchaseDate}
+              />
             </div>
             <Controller
               name="purchaseDate"
@@ -640,7 +910,7 @@ export default function ProductForm({
                   id="purchaseDate"
                   value={field.value}
                   onChange={(value) => {
-                    clearScanBadge("purchaseDate");
+                    markUserEdited("purchaseDate");
                     field.onChange(value);
                   }}
                   onBlur={field.onBlur}
@@ -657,9 +927,12 @@ export default function ProductForm({
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-1">
               <FormLabel htmlFor="warrantyExpiry" className="mb-0">
-                Warranty Expiry
+                Manufacturer warranty
               </FormLabel>
-              <ScanBadge show={scanFilled.has("warrantyExpiry")} />
+              <ScanBadge
+                show={scanFilled.has("warrantyExpiry")}
+                confidence={scanConfidence.warrantyExpiry}
+              />
             </div>
             <div className="mb-3 flex flex-wrap gap-2">
               {WARRANTY_PERIOD_OPTIONS.map((option) => {
@@ -689,7 +962,7 @@ export default function ProductForm({
                   id="warrantyExpiry"
                   value={field.value}
                   onChange={(value) => {
-                    clearScanBadge("warrantyExpiry");
+                    markUserEdited("warrantyExpiry");
                     setSelectedPeriodMonths(null);
                     field.onChange(value);
                   }}
@@ -699,6 +972,53 @@ export default function ProductForm({
                 />
               )}
             />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
+          <p className="text-sm font-medium text-white">
+            Store / extended cover
+          </p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            Extra cover from the retailer, AMC, or brand — separate from the
+            manufacturer period.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <FormLabel htmlFor="extendedType" optional>
+                Cover type
+              </FormLabel>
+              <select
+                id="extendedType"
+                className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-white outline-none transition focus:border-cyan-400"
+                {...register("extendedType")}
+              >
+                {EXTENDED_COVER_TYPES.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <FormLabel htmlFor="extendedExpiry" optional>
+                Extra cover expiry
+              </FormLabel>
+              <Controller
+                name="extendedExpiry"
+                control={control}
+                render={({ field }) => (
+                  <SmartDateField
+                    id="extendedExpiry"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    error={errors.extendedExpiry?.message}
+                    hint="Leave blank if you only have manufacturer cover"
+                  />
+                )}
+              />
+            </div>
           </div>
         </div>
 
@@ -747,8 +1067,8 @@ export default function ProductForm({
         <div>
           <h2 className="text-lg font-semibold text-white">More documents</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Add extra invoices, warranty cards, or other files. These do not
-            re-run document scanning.
+            Extra files stay attached. Invoice and warranty card uploads also
+            merge into the form.
           </p>
         </div>
 
@@ -759,7 +1079,9 @@ export default function ProductForm({
             </p>
             <UploadButtonComponent
               label="Add Invoice"
-              onChange={(url, fileType) => addDocument(url, "Invoice", false, fileType)}
+              onChange={(url, fileType, file) =>
+                addDocument(url, "Invoice", true, fileType, file)
+              }
             />
           </div>
           <div>
@@ -768,7 +1090,9 @@ export default function ProductForm({
             </p>
             <UploadButtonComponent
               label="Add Card"
-              onChange={(url, fileType) => addDocument(url, "Warranty Card", false, fileType)}
+              onChange={(url, fileType, file) =>
+                addDocument(url, "Warranty Card", true, fileType, file)
+              }
             />
           </div>
           <div>

@@ -1,9 +1,15 @@
 import Image from "next/image";
 
 const SIZE_MAP = {
-  sm: 28,
-  md: 36,
-  lg: 44,
+  sm: 32,
+  md: 40,
+  lg: 48,
+} as const;
+
+const WORDMARK_CLASS = {
+  sm: "text-sm",
+  md: "text-[15px]",
+  lg: "text-base",
 } as const;
 
 type BrandLogoProps = {
@@ -27,10 +33,10 @@ export default function BrandLogo({
   const mark = (
     <Image
       src="/brand/logo-mark.svg"
-      alt=""
+      alt="Warranty Vault"
       width={px}
       height={px}
-      className={`shrink-0 rounded-[10px] ${markClassName}`.trim()}
+      className={`shrink-0 ${markClassName}`.trim()}
       unoptimized
       priority
     />
@@ -41,7 +47,8 @@ export default function BrandLogo({
       <span
         className={`inline-flex shrink-0 ${className}`.trim()}
         style={{ width: px, height: px }}
-        aria-hidden
+        role="img"
+        aria-label="Warranty Vault"
       >
         {mark}
       </span>
@@ -52,7 +59,9 @@ export default function BrandLogo({
     tagline === false ? null : typeof tagline === "string" ? tagline : null;
 
   return (
-    <span className={`inline-flex items-center gap-3 ${className}`.trim()}>
+    <span
+      className={`inline-flex min-w-0 items-center gap-2.5 sm:gap-3 ${className}`.trim()}
+    >
       <span
         className="inline-flex shrink-0"
         style={{ width: px, height: px }}
@@ -61,11 +70,14 @@ export default function BrandLogo({
         {mark}
       </span>
       <span className="min-w-0 text-left">
-        <span className="block text-sm font-semibold tracking-tight text-white">
-          Warranty Vault AI
+        <span
+          className={`block font-semibold tracking-tight text-white ${WORDMARK_CLASS[size]}`}
+        >
+          <span className="sm:hidden">Warranty Vault</span>
+          <span className="hidden sm:inline">Warranty Vault AI</span>
         </span>
         {resolvedTagline ? (
-          <span className="mt-0.5 block text-[11px] text-gray-500">
+          <span className="mt-0.5 block truncate text-[11px] text-gray-500">
             {resolvedTagline}
           </span>
         ) : null}

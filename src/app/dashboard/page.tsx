@@ -5,6 +5,8 @@ import {
   ShieldAlert,
   Clock,
   Plus,
+  Download,
+  CalendarDays,
 } from "lucide-react";
 
 import AnimatedCounter from "@/components/animated-counter";
@@ -13,7 +15,12 @@ import ProductSearch from "@/components/product-search";
 import DashboardShell from "@/components/dashboard-shell";
 
 import { getSessionUser } from "@/lib/product-access";
-import { getDaysRemaining, isExpiringSoon } from "@/lib/warranty";
+import {
+  getCoverageStatus,
+  getEffectiveCover,
+} from "@/lib/coverage";
+import { getMembership } from "@/lib/household";
+import { getDaysRemaining } from "@/lib/warranty";
 import { getDashboardCounts, listProductsForUser } from "@/lib/products-query";
 
 export default async function DashboardPage() {
@@ -23,14 +30,14 @@ export default async function DashboardPage() {
     return null;
   }
 
-  const [{ items: products }, counts] = await Promise.all([
+  const [{ items: products }, counts, membership] = await Promise.all([
     listProductsForUser(user.id, { limit: 50 }),
     getDashboardCounts(user.id),
+    getMembership(user.id),
   ]);
 
   const expiringProducts = products.filter(
-    (product) =>
-      product.warrantyExpiry && isExpiringSoon(product.warrantyExpiry)
+    (product) => getCoverageStatus(product) === "expiring"
   );
 
   const firstName = user.name?.split(" ")[0] || "there";
@@ -49,11 +56,23 @@ export default async function DashboardPage() {
                 Welcome back, {firstName}
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-                Your warranty vault
+                {membership && membership.household.members.length > 1
+                  ? membership.household.name
+                  : "Your warranty vault"}
               </h1>
               <p className="mt-3 text-sm leading-7 text-gray-500 md:text-base">
-                Track products, documents, and expiry dates in one calm place.
+                {membership && membership.household.members.length > 1
+                  ? `Shared with ${membership.household.members.length} people. Track products, documents, and expiry dates together.`
+                  : "Track products, documents, and expiry dates in one calm place."}
               </p>
+              {membership && membership.household.members.length > 1 && (
+                <Link
+                  href="/dashboard/settings"
+                  className="mt-3 inline-block text-sm text-cyan-300/90 underline-offset-2 hover:underline"
+                >
+                  Manage household
+                </Link>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -144,9 +163,9 @@ export default async function DashboardPage() {
 
             <div className="space-y-2">
               {expiringProducts.map((product) => {
-                if (!product.warrantyExpiry) return null;
-                const daysRemaining = getDaysRemaining(product.warrantyExpiry);
-                const expired = daysRemaining < 0;
+                const cover = getEffectiveCover(product);
+                if (!cover) return null;
+                const daysRemaining = getDaysRemaining(cover.date);
 
                 return (
                   <Link
@@ -159,15 +178,13 @@ export default async function DashboardPage() {
                         {product.name}
                       </p>
                       <p className="mt-0.5 text-xs text-gray-500">
-                        {product.brand || "Unknown brand"}
+                        {[product.brand || "Unknown brand", cover.label]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                     </div>
-                    <span
-                      className={`text-sm font-medium ${
-                        expired ? "text-red-400" : "text-amber-300"
-                      }`}
-                    >
-                      {expired ? "Expired" : `${daysRemaining}d left`}
+                    <span className="text-sm font-medium text-amber-300">
+                      {daysRemaining}d left
                     </span>
                   </Link>
                 );
@@ -199,13 +216,31 @@ export default async function DashboardPage() {
           </section>
         ) : (
           <section id="products" className="space-y-4">
-            <div>
-              <h2 className="text-base font-semibold text-white">
-                Your products
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Search and filter by warranty status
-              </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-white">
+                  Your products
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Search and filter by warranty status
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href="/api/exports?format=csv"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition hover:border-white/20 hover:text-white"
+                >
+                  <Download size={14} />
+                  CSV
+                </a>
+                <a
+                  href="/api/exports?format=ics"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition hover:border-white/20 hover:text-white"
+                >
+                  <CalendarDays size={14} />
+                  Calendar
+                </a>
+              </div>
             </div>
             <ProductSearch products={products} />
           </section>

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 
 import DashboardNavbar from "@/components/dashboard-navbar";
 import BackgroundGlow from "@/components/background-glow";
+import InstallPrompt from "@/components/install-prompt";
 
 import { authOptions } from "@/lib/auth";
 import { getSessionUser } from "@/lib/product-access";
@@ -76,6 +77,7 @@ export default async function DashboardLayout({
         initialNotifications={initialNotifications}
       />
       <div className="relative z-10">{children}</div>
+      <InstallPrompt />
     </div>
   );
 }

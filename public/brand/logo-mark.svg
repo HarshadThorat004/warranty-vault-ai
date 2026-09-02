@@ -1,27 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" role="img" aria-label="Warranty Vault">
-  <!-- Cyan plate -->
-  <rect width="40" height="40" rx="10" fill="#22D3EE"/>
-  <!-- Vault door / shield body -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Warranty Vault">
+  <defs>
+    <!-- Dark premium metal -->
+    <linearGradient id="wvShieldFace" x1="18" y1="8" x2="46" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3A3F4A"/>
+      <stop offset="35%" stop-color="#1C1F26"/>
+      <stop offset="70%" stop-color="#0E1014"/>
+      <stop offset="100%" stop-color="#07080A"/>
+    </linearGradient>
+    <!-- Cool edge highlight -->
+    <linearGradient id="wvShieldSheen" x1="20" y1="10" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wvCheck" x1="22" y1="24" x2="42" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#A5F3FC"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+    <filter id="wvSoftShadow" x="-20%" y="-10%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
   <path
-    d="M20 8.5c-2.2 0-6.2 1.1-8.4 2.2-.7.3-1.1 1-1.1 1.8v8.6c0 5.6 3.9 9.6 9.5 11.7.3.1.7.1 1 0 5.6-2.1 9.5-6.1 9.5-11.7v-8.6c0-.8-.4-1.5-1.1-1.8-2.2-1.1-6.2-2.2-8.4-2.2Z"
-    fill="#0A0A0A"
+    d="M32 6c-4.8 0-14.2 2.5-19 5.1C11.2 12.1 10 13.8 10 16v17.2c0 13 8.9 21.8 21.2 26.2.5.2 1.1.2 1.6 0C45.1 55 54 46.2 54 33.2V16c0-2.2-1.2-3.9-3-4.9C46.2 8.5 36.8 6 32 6Z"
+    fill="url(#wvShieldFace)"
+    filter="url(#wvSoftShadow)"
   />
-  <!-- Inner vault panel -->
   <path
-    d="M20 11.2c-1.7 0-4.8.9-6.5 1.7-.3.1-.5.4-.5.7v6.7c0 4.2 2.9 7.3 7 8.9.2.1.4.1.6 0 4.1-1.6 7-4.7 7-8.9v-6.7c0-.3-.2-.6-.5-.7-1.7-.8-4.8-1.7-6.5-1.7Z"
-    fill="#22D3EE"
-    fill-opacity="0.22"
+    d="M32 11.5c-3.4 0-10.6 1.9-14.2 3.8-.7.4-1.1 1.1-1.1 1.9v12.2c0 9.6 6.5 16.3 14.7 19.5.4.2.8.2 1.2 0 8.2-3.2 14.7-9.9 14.7-19.5V17.2c0-.8-.4-1.5-1.1-1.9-3.6-1.9-10.8-3.8-14.2-3.8Z"
+    fill="url(#wvShieldSheen)"
   />
-  <!-- Lock body -->
-  <rect x="16.2" y="18.4" width="7.6" height="6.2" rx="1.6" fill="#22D3EE"/>
-  <!-- Lock shackle -->
+  <!-- Subtle cool rim -->
   <path
-    d="M17.8 18.4v-1.5a2.2 2.2 0 0 1 4.4 0v1.5"
+    d="M32 6c-4.8 0-14.2 2.5-19 5.1C11.2 12.1 10 13.8 10 16v17.2c0 13 8.9 21.8 21.2 26.2.5.2 1.1.2 1.6 0C45.1 55 54 46.2 54 33.2V16c0-2.2-1.2-3.9-3-4.9C46.2 8.5 36.8 6 32 6Z"
     stroke="#22D3EE"
-    stroke-width="1.7"
-    stroke-linecap="round"
+    stroke-opacity="0.28"
+    stroke-width="1.2"
   />
-  <!-- Keyhole -->
-  <circle cx="20" cy="21" r="1.05" fill="#0A0A0A"/>
-  <rect x="19.35" y="21.5" width="1.3" height="2" rx="0.45" fill="#0A0A0A"/>
+  <path
+    d="M22.2 32.4 28.8 39 42.2 24.2"
+    stroke="url(#wvCheck)"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
 </svg>

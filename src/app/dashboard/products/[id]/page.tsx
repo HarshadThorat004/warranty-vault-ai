@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Pencil, X } from "lucide-react";
+import { CalendarDays, FileDown, Pencil, X } from "lucide-react";
 
 import AIInsightsCard from "@/components/ai-insights-card";
 import DeleteProductButton from "@/components/delete-product-button";
@@ -13,10 +13,11 @@ import { assertProductOwner } from "@/lib/product-access";
 import {
   getDaysRemaining,
   getProductThumbnail,
-  isExpired,
   productUsesPdfCover,
 } from "@/lib/warranty";
-import { EXPIRING_SOON_DAYS } from "@/constants/warranty";
+import { categoryLabel, extendedCoverLabel } from "@/constants/catalog";
+import { getServiceChecklist } from "@/constants/service-checklist";
+import { getCoverageStatus, getEffectiveCover } from "@/lib/coverage";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -35,15 +36,22 @@ export default async function ProductPage({ params }: Props) {
   const purchaseDate = product.purchaseDate
     ? new Date(product.purchaseDate)
     : null;
-  const expiryDate = product.warrantyExpiry
+  const manufacturerExpiry = product.warrantyExpiry
     ? new Date(product.warrantyExpiry)
     : null;
+  const extendedExpiry = product.extendedExpiry
+    ? new Date(product.extendedExpiry)
+    : null;
+  const effectiveCover = getEffectiveCover(product);
+  const expiryDate = effectiveCover?.date ?? manufacturerExpiry;
+  const coverageStatus = getCoverageStatus(product);
+  const checklist = getServiceChecklist(product.category);
 
   const totalWarrantyDays =
-    purchaseDate && expiryDate
+    purchaseDate && manufacturerExpiry
       ? Math.max(
           Math.ceil(
-            (expiryDate.getTime() - purchaseDate.getTime()) /
+            (manufacturerExpiry.getTime() - purchaseDate.getTime()) /
               (1000 * 60 * 60 * 24)
           ),
           0
@@ -52,11 +60,14 @@ export default async function ProductPage({ params }: Props) {
 
   const daysRemaining = expiryDate ? getDaysRemaining(expiryDate) : 0;
   const safeDaysRemaining = Math.max(daysRemaining, 0);
-  const expired = expiryDate ? isExpired(expiryDate) : false;
-  const expiringSoon =
-    !!expiryDate && !expired && daysRemaining <= EXPIRING_SOON_DAYS;
+  const expired = coverageStatus === "expired";
+  const expiringSoon = coverageStatus === "expiring";
+  const manufacturerDaysRemaining = manufacturerExpiry
+    ? getDaysRemaining(manufacturerExpiry)
+    : 0;
 
-  const elapsedDays = totalWarrantyDays - safeDaysRemaining;
+  const elapsedDays =
+    totalWarrantyDays - Math.max(manufacturerDaysRemaining, 0);
   const progress =
     totalWarrantyDays > 0
       ? Math.min((elapsedDays / totalWarrantyDays) * 100, 100)
@@ -65,13 +76,16 @@ export default async function ProductPage({ params }: Props) {
   const thumbnail = getProductThumbnail(product);
   const pdfCover = productUsesPdfCover(product);
 
-  const statusLabel = expired
-    ? "Expired"
-    : expiringSoon
-      ? `${safeDaysRemaining} days left`
-      : expiryDate
-        ? "Active"
-        : "No expiry set";
+  const statusLabel =
+    coverageStatus === "expired"
+      ? "Expired"
+      : coverageStatus === "expiring"
+        ? `${safeDaysRemaining} days left`
+        : coverageStatus === "active"
+          ? effectiveCover?.id === "extended"
+            ? `${extendedCoverLabel(product.extendedType)} active`
+            : "Active"
+          : "No expiry set";
 
   const statusClass = expired
     ? "border-red-500/20 bg-red-500/10 text-red-300"
@@ -124,9 +138,15 @@ export default async function ProductPage({ params }: Props) {
                 {product.name}
               </h1>
               <p className="mt-2 text-sm text-gray-500">
-                {product.brand ?? "Unknown brand"}
-                {product.invoiceNumber ? ` · Invoice ${product.invoiceNumber}` : ""}
-                {product.serialNumber ? ` · SN ${product.serialNumber}` : ""}
+                {[
+                  product.brand ?? "Unknown brand",
+                  product.model,
+                  product.retailer,
+                  product.invoiceNumber ? `Invoice ${product.invoiceNumber}` : null,
+                  product.serialNumber ? `SN ${product.serialNumber}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
 
               {product.renewalAvailable && (
@@ -146,6 +166,22 @@ export default async function ProductPage({ params }: Props) {
                   <Pencil size={14} />
                   Edit
                 </Link>
+                <a
+                  href={`/api/products/${product.id}/claim-pack`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:text-white"
+                >
+                  <FileDown size={14} />
+                  Claim pack
+                </a>
+                {(manufacturerExpiry || extendedExpiry) && (
+                  <a
+                    href={`/api/exports?format=ics&productId=${product.id}`}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-200 transition hover:border-white/20 hover:text-white"
+                  >
+                    <CalendarDays size={14} />
+                    Calendar
+                  </a>
+                )}
                 <DeleteProductButton productId={product.id} />
               </div>
             </div>
@@ -162,17 +198,45 @@ export default async function ProductPage({ params }: Props) {
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
-            <p className="text-xs text-gray-500">Warranty expiry</p>
+            <p className="text-xs text-gray-500">Manufacturer warranty</p>
             <p className="mt-2 text-lg font-semibold text-white">
-              {expiryDate ? expiryDate.toLocaleDateString("en-US") : "Not set"}
+              {manufacturerExpiry
+                ? manufacturerExpiry.toLocaleDateString("en-US")
+                : "Not set"}
             </p>
           </div>
+          {extendedExpiry && (
+            <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
+              <p className="text-xs text-gray-500">
+                {extendedCoverLabel(product.extendedType)}
+              </p>
+              <p className="mt-2 text-lg font-semibold text-white">
+                {extendedExpiry.toLocaleDateString("en-US")}
+              </p>
+            </div>
+          )}
           <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
             <p className="text-xs text-gray-500">Added on</p>
             <p className="mt-2 text-lg font-semibold text-white">
               {new Date(product.createdAt).toLocaleDateString("en-US")}
             </p>
           </div>
+          {product.purchaseAmount && (
+            <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
+              <p className="text-xs text-gray-500">Purchase amount</p>
+              <p className="mt-2 text-lg font-semibold text-white">
+                ₹{product.purchaseAmount}
+              </p>
+            </div>
+          )}
+          {product.category && (
+            <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5">
+              <p className="text-xs text-gray-500">Category</p>
+              <p className="mt-2 text-lg font-semibold text-white">
+                {categoryLabel(product.category)}
+              </p>
+            </div>
+          )}
         </section>
 
         {product.notes && (
@@ -184,15 +248,15 @@ export default async function ProductPage({ params }: Props) {
           </section>
         )}
 
-        {!expired && totalWarrantyDays > 0 && (
+        {manufacturerDaysRemaining >= 0 && totalWarrantyDays > 0 && (
           <section className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 md:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-white">
-                  Warranty usage
+                  Manufacturer coverage
                 </h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  How much of the coverage period has passed
+                  How much of the brand warranty period has passed
                 </p>
               </div>
               <span className="text-sm font-medium text-gray-300">
@@ -213,7 +277,7 @@ export default async function ProductPage({ params }: Props) {
               <div className="rounded-xl border border-white/5 bg-black/30 p-4">
                 <p className="text-xs text-gray-500">Days left</p>
                 <p className="mt-1 text-2xl font-semibold text-white">
-                  {safeDaysRemaining}
+                  {Math.max(manufacturerDaysRemaining, 0)}
                 </p>
               </div>
               <div className="rounded-xl border border-white/5 bg-black/30 p-4">
@@ -249,9 +313,45 @@ export default async function ProductPage({ params }: Props) {
           />
         </section>
 
+        <section className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 md:p-6">
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-white">
+              {checklist.title}
+            </h2>
+            <p className="mt-1 text-xs text-gray-500">
+              Print the claim pack and tick these at the desk. Do not leave
+              originals behind.
+            </p>
+          </div>
+          <ul className="space-y-2.5">
+            {checklist.items.map((item) => (
+              <li
+                key={item}
+                className="flex gap-3 text-sm leading-6 text-gray-300"
+              >
+                <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-white/20" />
+                {item}
+              </li>
+            ))}
+          </ul>
+          <a
+            href={`/api/products/${product.id}/claim-pack`}
+            className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-cyan-300/90 hover:text-cyan-200"
+          >
+            <FileDown size={14} />
+            Download claim pack
+          </a>
+        </section>
+
         <AIInsightsCard
           daysRemaining={safeDaysRemaining}
           isExpired={expired}
+          coverLabel={effectiveCover?.label}
+          nextAction={
+            expired
+              ? "Keep the claim pack for service history."
+              : checklist.items[0]
+          }
         />
       </div>
     </DashboardShell>

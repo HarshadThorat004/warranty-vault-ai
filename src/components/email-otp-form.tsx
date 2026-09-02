@@ -13,9 +13,13 @@ import {
 
 type Props = {
   onBack?: () => void;
+  callbackUrl?: string;
 };
 
-export default function EmailOtpForm({ onBack }: Props) {
+export default function EmailOtpForm({
+  onBack,
+  callbackUrl = "/dashboard",
+}: Props) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -119,7 +123,7 @@ export default function EmailOtpForm({ onBack }: Props) {
       }
 
       toast.success("Welcome");
-      router.push("/dashboard");
+      router.push(callbackUrl);
       router.refresh();
     } catch (error) {
       console.error(error);

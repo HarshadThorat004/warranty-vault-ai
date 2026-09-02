@@ -15,6 +15,7 @@ import AuthShell, {
 } from "@/components/auth/auth-shell";
 import EmailOtpForm from "@/components/email-otp-form";
 import SocialAuthButtons from "@/components/social-auth-buttons";
+import { safeAuthCallbackUrl } from "@/lib/auth-callback";
 
 export default function LoginPage() {
   return (
@@ -35,6 +36,7 @@ export default function LoginPage() {
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const callbackUrl = safeAuthCallbackUrl(searchParams.get("callbackUrl"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -81,7 +83,7 @@ function LoginPageContent() {
       }
 
       toast.success("Welcome back");
-      router.push("/dashboard");
+      router.push(callbackUrl);
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -103,7 +105,11 @@ function LoginPageContent() {
         <p className="mt-2 text-sm text-white/45">
           Don&apos;t have an account?{" "}
           <Link
-            href="/register"
+            href={
+              callbackUrl !== "/dashboard"
+                ? `/register?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                : "/register"
+            }
             className="text-white underline decoration-white/30 underline-offset-2 hover:decoration-white/60"
           >
             Sign up.
@@ -116,6 +122,7 @@ function LoginPageContent() {
           <div className="space-y-5">
             <SocialAuthButtons
               mode="signin"
+              callbackUrl={callbackUrl}
               onUseOtp={() => setMode("otp")}
             />
 
@@ -188,7 +195,10 @@ function LoginPageContent() {
             </form>
           </div>
         ) : (
-          <EmailOtpForm onBack={() => setMode("password")} />
+          <EmailOtpForm
+            callbackUrl={callbackUrl}
+            onBack={() => setMode("password")}
+          />
         )}
       </div>
 

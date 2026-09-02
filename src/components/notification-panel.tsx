@@ -22,6 +22,7 @@ export type NotificationItem = {
 const TYPE_LABELS: Record<string, string> = {
   expiring_30: "Expires in 30 days",
   expiring_7: "Expires in 7 days",
+  expiring_1: "Expires tomorrow",
   expired: "Warranty expired",
   renewal_available: "Renewal available",
 };

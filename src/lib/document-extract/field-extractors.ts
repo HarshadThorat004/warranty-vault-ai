@@ -10,7 +10,15 @@ import {
   type FieldKey,
 } from "@/lib/document-extract/aliases";
 import { applyRetailerBoosts } from "@/lib/document-extract/retailer-boost";
-import type { ExtractedDocumentFields } from "@/lib/document-extract/types";
+import {
+  emptyExtractedFields,
+  setFieldMeta,
+  type ExtractedDocumentFields,
+  type FieldConfidence,
+  type FieldSource,
+} from "@/lib/document-extract/types";
+import { inferCategory, retailerDisplayName } from "@/lib/document-extract/classify";
+import { findGstins, isValidGstin, isValidImei } from "@/lib/document-extract/validate";
 
 /**
  * Indian invoice / warranty-card extraction.
@@ -51,7 +59,7 @@ const WORD_NUMBERS: Record<string, number> = {
 const PERIOD_AMOUNT =
   "(\\d{1,2}|one|two|three|four|five|six|twelve|eighteen|twenty(?:[\\s-]?four)?|thirty(?:[\\s-]?six)?|forty(?:[\\s-]?eight)?)";
 
-const PERIOD_UNIT = "(years?|yrs?|yr\\b|y\\b|months?|mons?|mos?|mths?|m\\b)";
+const PERIOD_UNIT = "(years?|yrs?|yr\\b|y\\b|months?|mons?|mos?|mths?|m\\b|महीने|माह|वर्ष|साल)";
 
 function normalizeText(raw: string) {
   return raw
@@ -260,7 +268,12 @@ function parsePeriodToMonths(amountRaw: string, unitRaw: string) {
 
   const unit = unitRaw.toLowerCase();
 
-  if (unit.startsWith("y") || unit.includes("yr")) {
+  if (
+    unit.startsWith("y") ||
+    unit.includes("yr") ||
+    unit.includes("वर्ष") ||
+    unit.includes("साल")
+  ) {
     return amount * 12;
   }
 
@@ -352,27 +365,50 @@ function extractInvoiceNumber(text: string, layoutValue = "") {
   return "";
 }
 
-function extractSerialNumber(text: string, layoutValue = "") {
-  const candidates = [
-    layoutValue,
-    extractLabeledValue(text, [
-      /(?:serial(?:\s*(?:no|number|#))?|sr\.?\s*no|s\/n|sl\.?\s*no|sno)\.?\s*[:\-#]?\s*([A-Z0-9][A-Z0-9\-\/]{3,40})/i,
-      /imei(?:\s*(?:no|number|#|1|2))?\.?\s*[:\-#]?\s*([0-9]{10,20})/i,
-      /(?:chassis|device)\s*(?:no|number|#)?\.?\s*[:\-#]?\s*([A-Z0-9][A-Z0-9\-\/]{4,40})/i,
-    ]),
-  ];
+function acceptSerialCandidate(raw: string, requireImeiLuhn: boolean) {
+  const value = cleanValue(raw);
+  const digits = value.replace(/\D/g, "");
 
-  for (const candidate of candidates) {
-    const value = cleanValue(candidate);
-    if (/^[A-Z0-9][A-Z0-9\-\/]{3,40}$/i.test(value)) {
-      return value;
-    }
+  if (requireImeiLuhn || (digits.length === 15 && /^\d+$/.test(value))) {
+    return isValidImei(digits) ? digits : "";
+  }
+
+  if (/^[A-Z0-9][A-Z0-9\-\/]{3,40}$/i.test(value)) {
+    return value;
   }
 
   return "";
 }
 
-function extractPurchaseDate(text: string, layoutValue = "") {
+function extractSerialNumber(text: string, layoutValue = "") {
+  const imeiLabelled = extractLabeledValue(text, [
+    /imei(?:\s*(?:no|number|#|1|2))?\.?\s*[:\-#]?\s*([0-9]{10,20})/i,
+    /\[?\s*imei\s*\/\s*serial\s*(?:no|number)?\s*[:\-]?\s*([A-Z0-9]{8,})\s*\]?/i,
+  ]);
+
+  const imeiAccepted = acceptSerialCandidate(imeiLabelled, true);
+  if (imeiAccepted) return imeiAccepted;
+
+  const candidates = [
+    layoutValue,
+    extractLabeledValue(text, [
+      /(?:serial(?:\s*(?:no|number|#))?|sr\.?\s*no|s\/n|sl\.?\s*no|sno)\.?\s*[:\-#]?\s*([A-Z0-9][A-Z0-9\-\/]{3,40})/i,
+      /(?:chassis|device)\s*(?:no|number|#)?\.?\s*[:\-#]?\s*([A-Z0-9][A-Z0-9\-\/]{4,40})/i,
+    ]),
+  ];
+
+  for (const candidate of candidates) {
+    const accepted = acceptSerialCandidate(candidate, false);
+    if (accepted) return accepted;
+  }
+
+  return "";
+}
+
+function extractPurchaseDate(
+  text: string,
+  layoutValue = ""
+): { value: string; labelled: boolean } {
   const tryParse = (raw: string) => {
     const direct = parseDateCandidate(raw);
     if (direct) return direct;
@@ -385,7 +421,7 @@ function extractPurchaseDate(text: string, layoutValue = "") {
 
   if (layoutValue) {
     const parsed = tryParse(layoutValue);
-    if (parsed) return parsed;
+    if (parsed) return { value: parsed, labelled: true };
   }
 
   const labeled = extractLabeledValue(text, [
@@ -396,7 +432,7 @@ function extractPurchaseDate(text: string, layoutValue = "") {
 
   if (labeled) {
     const parsed = tryParse(labeled);
-    if (parsed) return parsed;
+    if (parsed) return { value: parsed, labelled: true };
   }
 
   const datePatterns = [
@@ -409,7 +445,42 @@ function extractPurchaseDate(text: string, layoutValue = "") {
   for (const pattern of datePatterns) {
     for (const match of text.matchAll(pattern)) {
       const parsed = parseDateCandidate(match[1]);
-      if (parsed) return parsed;
+      if (parsed) return { value: parsed, labelled: false };
+    }
+  }
+
+  return { value: "", labelled: false };
+}
+
+function extractSellerGstin(text: string): { value: string; labelled: boolean } {
+  const labelled = extractLabeledValue(text, [
+    /(?:seller|supplier|tax)?\s*gstin(?:\s*(?:no|number|#))?\.?\s*[:\-#]?\s*([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z])/i,
+  ]);
+
+  if (labelled && isValidGstin(labelled)) {
+    return { value: labelled.toUpperCase(), labelled: true };
+  }
+
+  const found = findGstins(text);
+  if (found[0]) {
+    return { value: found[0], labelled: false };
+  }
+
+  return { value: "", labelled: false };
+}
+
+function extractPurchaseAmount(text: string) {
+  const patterns = [
+    /(?:grand\s*total|invoice\s*value|total\s*invoice\s*value|amount\s*payable)\s*[:\-]?\s*(?:₹|rs\.?|inr)?\s*([\d,]+\.?\d*)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match?.[1]) continue;
+
+    const amount = Number.parseFloat(match[1].replace(/,/g, ""));
+    if (Number.isFinite(amount) && amount > 0) {
+      return String(amount);
     }
   }
 
@@ -429,7 +500,9 @@ function extractBrand(text: string, layoutValue = "") {
     const knownFromLayout = COMMON_BRANDS.find((brand) =>
       layoutValue.toLowerCase().includes(brand.toLowerCase())
     );
-    if (knownFromLayout) return canonicalizeBrand(knownFromLayout);
+    if (knownFromLayout && !/^(amazon|croma)$/i.test(knownFromLayout)) {
+      return canonicalizeBrand(knownFromLayout);
+    }
 
     const firstToken = cleanValue(layoutValue).split(/\s+/)[0];
     if (firstToken && /^[A-Za-z][A-Za-z0-9&.-]{1,20}$/.test(firstToken)) {
@@ -553,56 +626,147 @@ function extractProductName(text: string, brand: string, layoutValue = "") {
   return best;
 }
 
+function extractModel(text: string) {
+  return extractLabeledValue(text, [
+    /model(?:\s*name|\s*no|\s*number)?\s*[:\-]\s*([A-Za-z0-9][^\n]{1,80})/i,
+  ]).slice(0, 80);
+}
+
 function finalizePurchaseDate(value: string) {
   if (!value) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   return parseDateCandidate(value) ?? "";
 }
 
+function metaFor(
+  usedLayout: boolean,
+  labelledFallback: boolean,
+  confidence: FieldConfidence = usedLayout || labelledFallback ? "high" : "medium"
+): { source: FieldSource; confidence: FieldConfidence } {
+  return {
+    source: usedLayout ? "layout" : "regex",
+    confidence,
+  };
+}
+
 export function extractFieldsFromText(rawText: string): ExtractedDocumentFields {
   const text = normalizeText(rawText);
 
   if (!text) {
-    return {
-      name: "",
-      brand: "",
-      serialNumber: "",
-      invoiceNumber: "",
-      purchaseDate: "",
-      warrantyPeriod: null,
-    };
+    return emptyExtractedFields();
   }
 
   const retailer = detectRetailer(text);
   const pairs = buildLayoutPairs(text);
 
-  const brand = extractBrand(text, firstLayoutValue(pairs, "brand"));
-  const base: ExtractedDocumentFields = {
-    name: extractProductName(text, brand, firstLayoutValue(pairs, "name")),
-    brand,
-    serialNumber: extractSerialNumber(
-      text,
-      firstLayoutValue(pairs, "serialNumber")
-    ),
-    invoiceNumber: extractInvoiceNumber(
-      text,
-      firstLayoutValue(pairs, "invoiceNumber")
-    ),
-    purchaseDate: extractPurchaseDate(
-      text,
-      firstLayoutValue(pairs, "purchaseDate")
-    ),
-    warrantyPeriod: extractWarrantyPeriodMonths(
-      text,
-      firstLayoutValue(pairs, "warrantyPeriod")
-    ),
-  };
+  const layoutName = firstLayoutValue(pairs, "name");
+  const layoutBrand = firstLayoutValue(pairs, "brand");
+  const layoutSerial = firstLayoutValue(pairs, "serialNumber");
+  const layoutInvoice = firstLayoutValue(pairs, "invoiceNumber");
+  const layoutDate = firstLayoutValue(pairs, "purchaseDate");
+  const layoutWarranty = firstLayoutValue(pairs, "warrantyPeriod");
+
+  const brand = extractBrand(text, layoutBrand);
+  const purchaseDate = extractPurchaseDate(text, layoutDate);
+  const gstin = extractSellerGstin(text);
+  const purchaseAmount = extractPurchaseAmount(text);
+
+  const base = emptyExtractedFields();
+  base.name = extractProductName(text, brand, layoutName);
+  base.brand = brand;
+  base.serialNumber = extractSerialNumber(text, layoutSerial);
+  base.invoiceNumber = extractInvoiceNumber(text, layoutInvoice);
+  base.purchaseDate = purchaseDate.value;
+  base.warrantyPeriod = extractWarrantyPeriodMonths(text, layoutWarranty);
+  base.sellerGstin = gstin.value;
+  base.purchaseAmount = purchaseAmount;
+  base.model = extractModel(text);
+  base.retailer = retailerDisplayName(retailer);
+  base.category = inferCategory(base.name, text);
+
+  if (base.name) {
+    setFieldMeta(base, "name", metaFor(Boolean(layoutName), false, layoutName ? "high" : "medium"));
+  }
+  if (base.brand) {
+    setFieldMeta(
+      base,
+      "brand",
+      metaFor(Boolean(layoutBrand), /brand\s*[:\-]/i.test(text), layoutBrand ? "high" : "medium")
+    );
+  }
+  if (base.serialNumber) {
+    setFieldMeta(base, "serialNumber", metaFor(Boolean(layoutSerial), /imei|serial/i.test(text), "high"));
+  }
+  if (base.invoiceNumber) {
+    setFieldMeta(base, "invoiceNumber", metaFor(Boolean(layoutInvoice), true, "high"));
+  }
+  if (base.purchaseDate) {
+    setFieldMeta(
+      base,
+      "purchaseDate",
+      metaFor(Boolean(layoutDate), purchaseDate.labelled, purchaseDate.labelled ? "high" : "low")
+    );
+  }
+  if (base.warrantyPeriod) {
+    setFieldMeta(
+      base,
+      "warrantyPeriod",
+      metaFor(Boolean(layoutWarranty), false, layoutWarranty ? "high" : "medium")
+    );
+  }
+  if (base.sellerGstin) {
+    setFieldMeta(
+      base,
+      "sellerGstin",
+      { source: "regex", confidence: gstin.labelled ? "high" : "medium" }
+    );
+  }
+  if (base.purchaseAmount) {
+    setFieldMeta(base, "purchaseAmount", { source: "regex", confidence: "high" });
+  }
+  if (base.model) {
+    setFieldMeta(base, "model", { source: "regex", confidence: "high" });
+  }
+  if (base.retailer) {
+    setFieldMeta(base, "retailer", { source: "retailer", confidence: "medium" });
+  }
+  if (base.category) {
+    setFieldMeta(base, "category", { source: "regex", confidence: "medium" });
+  }
 
   const boosted = applyRetailerBoosts(text, retailer, base);
+  const digits = boosted.serialNumber.replace(/\D/g, "");
+
+  if (
+    digits.length === 15 &&
+    /imei/i.test(text) &&
+    !isValidImei(digits)
+  ) {
+    boosted.serialNumber = "";
+    delete boosted.fieldMeta.serialNumber;
+  }
+
+  if (!base.invoiceNumber && boosted.invoiceNumber) {
+    setFieldMeta(boosted, "invoiceNumber", { source: "retailer", confidence: "medium" });
+  }
+  if (!base.serialNumber && boosted.serialNumber) {
+    setFieldMeta(boosted, "serialNumber", { source: "retailer", confidence: "medium" });
+  }
+  if (!base.name && boosted.name) {
+    setFieldMeta(boosted, "name", { source: "retailer", confidence: "medium" });
+  }
+  if (!base.purchaseDate && boosted.purchaseDate) {
+    setFieldMeta(boosted, "purchaseDate", { source: "retailer", confidence: "medium" });
+  }
+  if (!base.warrantyPeriod && boosted.warrantyPeriod) {
+    setFieldMeta(boosted, "warrantyPeriod", { source: "retailer", confidence: "medium" });
+  }
 
   return {
     ...boosted,
     purchaseDate: finalizePurchaseDate(boosted.purchaseDate),
     name: stripTrailingMoney(boosted.name).slice(0, 140),
+    category: boosted.category || inferCategory(boosted.name, text),
+    retailer: boosted.retailer || retailerDisplayName(retailer),
   };
 }

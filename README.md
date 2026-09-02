@@ -219,6 +219,15 @@ If Google env vars are missing, that button stays hidden automatically. Password
 
 ---
 
+# Next priorities
+
+Do these in order — trust and reliability before more features:
+
+1. **Production email** — Verify `warrantyvault.in` in Resend, set `RESEND_FROM_EMAIL` / `CRON_SECRET` on Vercel so OTP and warranty reminders reach real users.
+2. **First-run empty dashboard** — When a user has 0 products, show one clear “Add your first product” path.
+3. **Mobile / polish pass** — Document viewer, logo, and add-product flow on small screens.
+4. **Later (after real usage)** — Pricing, help center, analytics dashboard, multi-user orgs, export reports.
+
 # Production Features
 
 - App Router architecture
@@ -232,12 +241,14 @@ If Google env vars are missing, that button stays hidden automatically. Password
 - File upload support
 - Warranty analytics
 - Email warranty reminders (Resend + cron)
+- Household vault (email invite, owner/member)
+- Lean marketing footer (landing only)
 
 # Future Improvements
 
-- PDF preview support
+- PDF preview enhancements
 - Analytics dashboard
-- Multi-user organization support
+- Multi-user organization / RBAC (beyond household)
 - Cloud storage optimization
 - Export reports
 

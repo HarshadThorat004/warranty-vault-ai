@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useUploadThing } from "@/lib/uploadthing";
 import { toast } from "sonner";
 import { FileImage, FileText, Loader2, Upload } from "lucide-react";
 
 type Props = {
-  onChange: (url: string, fileType?: string) => void;
+  onChange: (url: string, fileType?: string, file?: File) => void;
   label: string;
   description?: string;
   size?: "md" | "lg";
+  capture?: boolean;
 };
 
 export default function UploadButtonComponent({
@@ -17,17 +18,22 @@ export default function UploadButtonComponent({
   label,
   description = "Image or PDF up to 8MB",
   size = "md",
+  capture = false,
 }: Props) {
   const [isUploading, setIsUploading] = useState(false);
+  const pendingFile = useRef<File | null>(null);
 
   const { startUpload } = useUploadThing("documentUploader", {
     onClientUploadComplete: (res) => {
+      const file = pendingFile.current;
+      pendingFile.current = null;
       setIsUploading(false);
       if (res?.[0]?.ufsUrl) {
-        onChange(res[0].ufsUrl, res[0].type || undefined);
+        onChange(res[0].ufsUrl, res[0].type || undefined, file ?? undefined);
       }
     },
     onUploadError: (error) => {
+      pendingFile.current = null;
       setIsUploading(false);
       toast.error(error.message || "Upload failed");
     },
@@ -51,6 +57,7 @@ export default function UploadButtonComponent({
       return;
     }
 
+    pendingFile.current = file;
     setIsUploading(true);
     await startUpload([file]);
   }
@@ -65,7 +72,8 @@ export default function UploadButtonComponent({
     >
       <input
         type="file"
-        accept="image/*,application/pdf"
+        accept={capture ? "image/*" : "image/*,application/pdf"}
+        capture={capture ? "environment" : undefined}
         className="sr-only"
         disabled={isUploading}
         onChange={handleFileChange}

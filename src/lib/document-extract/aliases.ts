@@ -31,6 +31,8 @@ export const LABEL_ALIASES: Record<FieldKey, RegExp[]> = {
     /^(?:document)\s*(?:no|number|#)\.?$/i,
     /^(?:voucher)\s*(?:no|number|#)\.?$/i,
     /^(?:challan)\s*(?:no|number|#)\.?$/i,
+    /^(?:चालान|इनवॉइस|इनवोइस)(?:\s*(?:संख्या|नंबर|नम्बर|नं\.?))?$/u,
+    /^(?:बिल)(?:\s*(?:संख्या|नंबर|नं\.?))?$/u,
   ],
   serialNumber: [
     /^(?:serial(?:\s*(?:no|number|#))?|sr\.?\s*no|s\/n|sl\.?\s*no|sno)\.?$/i,
@@ -40,6 +42,8 @@ export const LABEL_ALIASES: Record<FieldKey, RegExp[]> = {
     /^(?:chassis|device|unit)\s*(?:no|number|#)?\.?$/i,
     /^(?:product)\s*(?:serial|sr\.?\s*no)\.?$/i,
     /^(?:barcode|ean|upc)$/i,
+    /^(?:सीरियल|क्रमांक|क्रम\s*संख्या)(?:\s*(?:नंबर|नं\.?))?$/u,
+    /^(?:आईएमईआई)$/u,
   ],
   purchaseDate: [
     /^(?:date\s*of\s*purchase|purchase\s*date|dop)$/i,
@@ -48,6 +52,7 @@ export const LABEL_ALIASES: Record<FieldKey, RegExp[]> = {
     /^(?:delivery\s*date|ship(?:ping)?\s*date)$/i,
     /^(?:dated|sold\s*on|billing\s*date)$/i,
     /^(?:date)$/i,
+    /^(?:दिनांक|तारीख|खरीद\s*तिथि|बिल\s*तिथि)$/u,
   ],
   brand: [
     /^brand$/i,
@@ -56,8 +61,7 @@ export const LABEL_ALIASES: Record<FieldKey, RegExp[]> = {
     /^company$/i,
     /^oem$/i,
     /^mfr\.?$/i,
-    /^sold\s*by$/i,
-    /^seller$/i,
+    /^(?:ब्रांड|निर्माता|कंपनी)$/u,
   ],
   name: [
     /^(?:product|item|description|particulars|goods|commodity)(?:\s*name|\s*desc|\s*title)?$/i,
@@ -65,6 +69,7 @@ export const LABEL_ALIASES: Record<FieldKey, RegExp[]> = {
     /^(?:model(?:\s*name|\s*no|\s*number)?|product\s*details|article)$/i,
     /^(?:title|sku\s*name|product\s*info)$/i,
     /^(?:hsn\s*description|goods\s*description)$/i,
+    /^(?:विवरण|वस्तु|उत्पाद|सामान)$/u,
   ],
   warrantyPeriod: [
     new RegExp(
@@ -74,6 +79,7 @@ export const LABEL_ALIASES: Record<FieldKey, RegExp[]> = {
     /^(?:valid(?:ity)?|cover(?:age)?)\s*(?:period|term|until)?$/i,
     /^(?:manufacturer\s*warranty|brand\s*warranty|standard\s*warranty)$/i,
     /^(?:service\s*period|support\s*period)$/i,
+    /^(?:वारंटी|गारंटी)(?:\s*(?:अवधि|काल|पीरियड))?$/u,
   ],
 };
 

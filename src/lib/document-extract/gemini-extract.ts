@@ -4,7 +4,12 @@
  */
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-import type { ExtractedDocumentFields } from "@/lib/document-extract/types";
+import {
+  emptyExtractedFields,
+  setFieldMeta,
+  type ExtractedDocumentFields,
+  type ExtractedFieldKey,
+} from "@/lib/document-extract/types";
 
 const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
@@ -69,15 +74,36 @@ Rules:
       ? parsed.warrantyPeriod
       : Number.parseInt(String(parsed.warrantyPeriod ?? ""), 10);
 
-  return {
-    name: parsed.name?.trim() ?? "",
-    brand: parsed.brand?.trim() ?? "",
-    serialNumber: parsed.serialNumber?.trim() ?? "",
-    invoiceNumber: parsed.invoiceNumber?.trim() ?? "",
-    purchaseDate: parsed.purchaseDate?.trim() ?? "",
-    warrantyPeriod:
-      Number.isFinite(warrantyPeriod) && warrantyPeriod > 0
-        ? warrantyPeriod
-        : null,
-  };
+  const fields = emptyExtractedFields();
+  fields.name = parsed.name?.trim() ?? "";
+  fields.brand = parsed.brand?.trim() ?? "";
+  fields.serialNumber = parsed.serialNumber?.trim() ?? "";
+  fields.invoiceNumber = parsed.invoiceNumber?.trim() ?? "";
+  fields.purchaseDate = parsed.purchaseDate?.trim() ?? "";
+  fields.warrantyPeriod =
+    Number.isFinite(warrantyPeriod) && warrantyPeriod > 0
+      ? warrantyPeriod
+      : null;
+
+  const keys: ExtractedFieldKey[] = [
+    "name",
+    "brand",
+    "serialNumber",
+    "invoiceNumber",
+    "purchaseDate",
+    "warrantyPeriod",
+  ];
+
+  for (const key of keys) {
+    const present =
+      key === "warrantyPeriod"
+        ? Boolean(fields.warrantyPeriod)
+        : fields[key].trim().length > 0;
+
+    if (present) {
+      setFieldMeta(fields, key, { source: "vision", confidence: "medium" });
+    }
+  }
+
+  return fields;
 }

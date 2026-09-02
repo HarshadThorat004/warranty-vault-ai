@@ -46,14 +46,28 @@ type ReminderEmailInput = {
   type: string;
   expiryDate: Date | null;
   renewalNotes?: string | null;
+  coverLabel?: string | null;
 };
 
-const SUBJECTS: Record<string, string> = {
-  expiring_30: "Warranty reminder: expires in 30 days",
-  expiring_7: "Urgent: warranty expires in 7 days",
-  expired: "Warranty has expired",
-  renewal_available: "Warranty renewal available",
-};
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function reminderSubject(type: string, coverLabel?: string | null) {
+  const cover = coverLabel || "Warranty";
+  const subjects: Record<string, string> = {
+    expiring_30: `${cover} reminder: expires in 30 days`,
+    expiring_7: `Urgent: ${cover.toLowerCase()} expires in 7 days`,
+    expiring_1: `${cover} expires tomorrow`,
+    expired: `${cover} has expired`,
+    renewal_available: "Warranty renewal available",
+  };
+  return subjects[type] ?? "Warranty reminder";
+}
 
 function getFrom() {
   return process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
@@ -204,10 +218,12 @@ function buildBody(input: ReminderEmailInput) {
       })
     : "N/A";
 
+  const cover = input.coverLabel || "warranty";
   const messages: Record<string, string> = {
-    expiring_30: `Your warranty for <strong>${input.productName}${brand}</strong> expires on <strong>${expiry}</strong> (within 30 days).`,
-    expiring_7: `Urgent: your warranty for <strong>${input.productName}${brand}</strong> expires on <strong>${expiry}</strong> (within 7 days).`,
-    expired: `Your warranty for <strong>${input.productName}${brand}</strong> expired on <strong>${expiry}</strong>.`,
+    expiring_30: `Your ${cover.toLowerCase()} for <strong>${input.productName}${brand}</strong> expires on <strong>${expiry}</strong> (within 30 days).`,
+    expiring_7: `Urgent: your ${cover.toLowerCase()} for <strong>${input.productName}${brand}</strong> expires on <strong>${expiry}</strong> (within 7 days).`,
+    expiring_1: `Your ${cover.toLowerCase()} for <strong>${input.productName}${brand}</strong> expires tomorrow (<strong>${expiry}</strong>).`,
+    expired: `Your ${cover.toLowerCase()} for <strong>${input.productName}${brand}</strong> expired on <strong>${expiry}</strong>.`,
     renewal_available: `A renewal option is available for <strong>${input.productName}${brand}</strong>.${
       input.renewalNotes ? ` Notes: ${input.renewalNotes}` : ""
     }`,
@@ -291,7 +307,7 @@ export async function sendReminderEmail(input: ReminderEmailInput) {
   try {
     await sendViaResend({
       to: input.to,
-      subject: SUBJECTS[input.type] ?? "Warranty reminder",
+      subject: reminderSubject(input.type, input.coverLabel),
       html: buildBody(input),
     });
     return { skipped: false as const };
@@ -333,6 +349,41 @@ export async function sendOtpEmail(to: string, code: string) {
         <p>Use this one-time code to sign in:</p>
         <p style="font-size: 28px; letter-spacing: 6px; font-weight: 700; margin: 20px 0;">${code}</p>
         <p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>
+      </div>
+    `,
+  });
+
+  return { skipped: false as const };
+}
+
+export async function sendHouseholdInviteEmail(input: {
+  to: string;
+  inviterName: string | null;
+  inviterEmail: string;
+  householdName: string;
+  acceptUrl: string;
+}) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY missing — skipping household invite email");
+    return { skipped: true as const, reason: "config" as const };
+  }
+
+  const who = escapeHtml(input.inviterName?.trim() || input.inviterEmail);
+  const vaultName = escapeHtml(input.householdName);
+
+  await sendViaResend({
+    to: input.to,
+    subject: `${input.inviterName?.trim() || input.inviterEmail} invited you to a shared Warranty Vault`,
+    html: `
+      <div style="font-family: Inter, system-ui, sans-serif; color: #111; line-height: 1.6;">
+        <h2 style="margin-bottom: 8px;">Warranty Vault AI</h2>
+        <p>${who} invited you to share <strong>${vaultName}</strong> — one vault for household invoices, warranties, and expiry reminders.</p>
+        <p style="margin: 24px 0;">
+          <a href="${input.acceptUrl}" style="display: inline-block; background: #111; color: #fff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 600;">
+            Join the vault
+          </a>
+        </p>
+        <p>This invite expires in 7 days. If you did not expect this, you can ignore the email.</p>
       </div>
     `,
   });

@@ -9,10 +9,9 @@ import type { Product } from "@/types/product";
 import {
   getDaysRemaining,
   getProductThumbnail,
-  isExpired,
-  isExpiringSoon,
   productUsesPdfCover,
 } from "@/lib/warranty";
+import { getCoverageStatus, getEffectiveExpiry } from "@/lib/coverage";
 import PdfPlaceholder from "@/components/pdf-placeholder";
 
 type Props = {
@@ -30,14 +29,20 @@ export default function ProductSearch({ products }: Props) {
       const searchText = search.toLowerCase();
       const matchesSearch =
         product.name.toLowerCase().includes(searchText) ||
-        (product.brand ?? "").toLowerCase().includes(searchText);
+        (product.brand ?? "").toLowerCase().includes(searchText) ||
+        (product.model ?? "").toLowerCase().includes(searchText) ||
+        (product.retailer ?? "").toLowerCase().includes(searchText) ||
+        (product.serialNumber ?? "").toLowerCase().includes(searchText) ||
+        (product.invoiceNumber ?? "").toLowerCase().includes(searchText);
 
-      if (!product.warrantyExpiry) {
+      const expiry = getEffectiveExpiry(product);
+      if (!expiry) {
         return filter === "all" ? matchesSearch : false;
       }
 
-      const expired = isExpired(product.warrantyExpiry);
-      const expiring = isExpiringSoon(product.warrantyExpiry);
+      const status = getCoverageStatus(product);
+      const expired = status === "expired";
+      const expiring = status === "expiring";
 
       if (filter === "active") return matchesSearch && !expired;
       if (filter === "expiring") return matchesSearch && expiring;
@@ -46,11 +51,11 @@ export default function ProductSearch({ products }: Props) {
     });
 
     return list.sort((a, b) => {
-      if (!a.warrantyExpiry) return 1;
-      if (!b.warrantyExpiry) return -1;
-      return (
-        getDaysRemaining(a.warrantyExpiry) - getDaysRemaining(b.warrantyExpiry)
-      );
+      const aExpiry = getEffectiveExpiry(a);
+      const bExpiry = getEffectiveExpiry(b);
+      if (!aExpiry) return 1;
+      if (!bExpiry) return -1;
+      return getDaysRemaining(aExpiry) - getDaysRemaining(bExpiry);
     });
   }, [products, search, filter]);
 
@@ -64,7 +69,7 @@ export default function ProductSearch({ products }: Props) {
           />
           <input
             type="text"
-            placeholder="Search by name or brand…"
+            placeholder="Search name, brand, serial, invoice…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search products"
@@ -116,15 +121,11 @@ export default function ProductSearch({ products }: Props) {
           {filteredProducts.map((product) => {
             const thumbnail = getProductThumbnail(product);
             const pdfCover = productUsesPdfCover(product);
-            const daysRemaining = product.warrantyExpiry
-              ? getDaysRemaining(product.warrantyExpiry)
-              : null;
-            const expired = product.warrantyExpiry
-              ? isExpired(product.warrantyExpiry)
-              : false;
-            const expiring = product.warrantyExpiry
-              ? isExpiringSoon(product.warrantyExpiry)
-              : false;
+            const expiry = getEffectiveExpiry(product);
+            const daysRemaining = expiry ? getDaysRemaining(expiry) : null;
+            const status = getCoverageStatus(product);
+            const expired = status === "expired";
+            const expiring = status === "expiring";
 
             return (
               <Link
@@ -199,10 +200,8 @@ export default function ProductSearch({ products }: Props) {
                     <div className="flex justify-between text-gray-500">
                       <span>Expiry</span>
                       <span className="text-gray-300">
-                        {product.warrantyExpiry
-                          ? new Date(
-                              product.warrantyExpiry
-                            ).toLocaleDateString("en-US")
+                        {expiry
+                          ? new Date(expiry).toLocaleDateString("en-US")
                           : "—"}
                       </span>
                     </div>

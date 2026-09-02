@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -17,10 +17,29 @@ import AuthShell, {
 } from "@/components/auth/auth-shell";
 import EmailOtpForm from "@/components/email-otp-form";
 import SocialAuthButtons from "@/components/social-auth-buttons";
+import { safeAuthCallbackUrl } from "@/lib/auth-callback";
 import { registerSchema } from "@/lib/validations/auth";
 
 export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthShell showHomeLink={false}>
+          <div className="flex justify-center py-20">
+            <Loader2 className="animate-spin text-white/40" size={20} />
+          </div>
+        </AuthShell>
+      }
+    >
+      <RegisterPageContent />
+    </Suspense>
+  );
+}
+
+function RegisterPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = safeAuthCallbackUrl(searchParams.get("callbackUrl"));
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<"password" | "otp">("password");
@@ -68,11 +87,15 @@ export default function RegisterPage() {
 
       if (login?.error) {
         toast.message("Account created. Please sign in.");
-        router.push("/login");
+        router.push(
+          callbackUrl !== "/dashboard"
+            ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+            : "/login"
+        );
         return;
       }
 
-      router.push("/dashboard");
+      router.push(callbackUrl);
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -92,7 +115,11 @@ export default function RegisterPage() {
         <p className="mt-2 text-sm text-white/45">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href={
+              callbackUrl !== "/dashboard"
+                ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                : "/login"
+            }
             className="text-white underline decoration-white/30 underline-offset-2 hover:decoration-white/60"
           >
             Log in.
@@ -105,6 +132,7 @@ export default function RegisterPage() {
           <div className="space-y-5">
             <SocialAuthButtons
               mode="signup"
+              callbackUrl={callbackUrl}
               onUseOtp={() => setMode("otp")}
             />
 
@@ -212,7 +240,10 @@ export default function RegisterPage() {
             </form>
           </div>
         ) : (
-          <EmailOtpForm onBack={() => setMode("password")} />
+          <EmailOtpForm
+            callbackUrl={callbackUrl}
+            onBack={() => setMode("password")}
+          />
         )}
       </div>
 

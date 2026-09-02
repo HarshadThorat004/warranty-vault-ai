@@ -12,8 +12,18 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Warranty Vault AI",
   description: "Track your product warranties easily",
+  applicationName: "Warranty Vault AI",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Warranty Vault",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
-    icon: [{ url: "/brand/favicon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/brand/favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/logo-mark.svg", type: "image/svg+xml", sizes: "any" },
+    ],
     apple: [{ url: "/brand/logo-mark.svg" }],
   },
 };

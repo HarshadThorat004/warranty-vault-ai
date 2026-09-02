@@ -1,5 +1,7 @@
-import { createWorker, PSM } from "tesseract.js";
+import { PSM, type Worker as TesseractWorker } from "tesseract.js";
 import sharp from "sharp";
+
+import { createOcrWorker } from "@/lib/document-extract/ocr-langs";
 
 const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
 
@@ -60,8 +62,9 @@ export async function fetchDocumentBuffer(url: string) {
 }
 
 async function extractPdfText(buffer: Buffer) {
-  const pdfParse = (await import("pdf-parse")).default;
-  const parsed = await pdfParse(buffer);
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+  const parsed = await parser.getText();
   return (parsed.text ?? "").trim();
 }
 
@@ -87,23 +90,45 @@ async function preprocessImage(buffer: Buffer) {
     .toBuffer();
 }
 
-async function extractImageText(buffer: Buffer) {
-  const processed = await preprocessImage(buffer);
-  const worker = await createWorker("eng", 1, {
-    logger: () => undefined,
+async function recognizeWithPsm(
+  worker: TesseractWorker,
+  image: Buffer,
+  psm: typeof PSM.AUTO | typeof PSM.SPARSE_TEXT
+) {
+  await worker.setParameters({
+    tessedit_pageseg_mode: psm,
+    preserve_interword_spaces: "1",
   });
 
+  const { data } = await worker.recognize(image);
+
+  return {
+    text: (data.text ?? "").trim(),
+    confidence: data.confidence ?? 0,
+  };
+}
+
+async function extractImageText(buffer: Buffer) {
+  const processed = await preprocessImage(buffer);
+  const worker = await createOcrWorker();
+
   try {
-    await worker.setParameters({
-      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
-      preserve_interword_spaces: "1",
-    });
+    const auto = await recognizeWithPsm(worker, processed, PSM.AUTO);
 
-    const {
-      data: { text },
-    } = await worker.recognize(processed);
+    if (auto.confidence >= 55 && auto.text.length >= 20) {
+      return auto.text;
+    }
 
-    return text.trim();
+    const sparse = await recognizeWithPsm(worker, processed, PSM.SPARSE_TEXT);
+
+    if (
+      sparse.confidence > auto.confidence ||
+      sparse.text.length > auto.text.length
+    ) {
+      return sparse.text;
+    }
+
+    return auto.text;
   } finally {
     await worker.terminate();
   }

@@ -8,6 +8,7 @@ import {
   Plus,
   LogOut,
   Menu,
+  Settings,
   X,
 } from "lucide-react";
 
@@ -57,6 +58,14 @@ export default function DashboardNavbar({
             Add product
           </Link>
 
+          <Link
+            href="/dashboard/settings"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
+          >
+            <Settings size={16} />
+            Settings
+          </Link>
+
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/login" })}
@@ -98,6 +107,13 @@ export default function DashboardNavbar({
               className="rounded-xl px-3 py-2.5 text-sm text-gray-300 hover:bg-white/5"
             >
               Add product
+            </Link>
+            <Link
+              href="/dashboard/settings"
+              onClick={() => setMobileOpen(false)}
+              className="rounded-xl px-3 py-2.5 text-sm text-gray-300 hover:bg-white/5"
+            >
+              Settings
             </Link>
             <button
               type="button"

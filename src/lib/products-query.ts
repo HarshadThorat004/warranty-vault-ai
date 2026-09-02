@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
+import { productStatusWhere } from "@/lib/coverage";
+import { getHouseholdIdForUser, vaultProductWhere } from "@/lib/household";
 import { prisma } from "@/lib/prisma";
 import { getReminderWindowDates } from "@/lib/reminders";
 
@@ -34,44 +36,33 @@ export function parseProductListParams(searchParams: URLSearchParams) {
 
 export function buildProductWhere(
   userId: string,
+  householdId: string | null,
   params: {
     q?: string;
     status?: ProductListStatus;
   }
 ): Prisma.ProductWhereInput {
   const { today, in30 } = getReminderWindowDates();
-  const clauses: Prisma.ProductWhereInput[] = [{ userId }];
+  const clauses: Prisma.ProductWhereInput[] = [
+    vaultProductWhere(userId, householdId),
+  ];
 
   if (params.q) {
     clauses.push({
       OR: [
         { name: { contains: params.q, mode: "insensitive" } },
         { brand: { contains: params.q, mode: "insensitive" } },
+        { model: { contains: params.q, mode: "insensitive" } },
+        { retailer: { contains: params.q, mode: "insensitive" } },
         { serialNumber: { contains: params.q, mode: "insensitive" } },
         { invoiceNumber: { contains: params.q, mode: "insensitive" } },
       ],
     });
   }
 
-  if (params.status === "active") {
-    clauses.push({
-      warrantyExpiry: {
-        gt: in30,
-      },
-    });
-  } else if (params.status === "expiring") {
-    clauses.push({
-      warrantyExpiry: {
-        gte: today,
-        lte: in30,
-      },
-    });
-  } else if (params.status === "expired") {
-    clauses.push({
-      warrantyExpiry: {
-        lt: today,
-      },
-    });
+  if (params.status && params.status !== "all") {
+    const extra = productStatusWhere(params.status, today, in30);
+    if (extra) clauses.push(extra);
   }
 
   return clauses.length === 1
@@ -85,10 +76,16 @@ const productListSelect = {
   id: true,
   name: true,
   brand: true,
+  model: true,
+  category: true,
+  retailer: true,
   serialNumber: true,
   invoiceNumber: true,
+  purchaseAmount: true,
   purchaseDate: true,
   warrantyExpiry: true,
+  extendedExpiry: true,
+  extendedType: true,
   invoiceImage: true,
   notes: true,
   renewalAvailable: true,
@@ -119,7 +116,8 @@ export async function listProductsForUser(
   }
 ) {
   const take = Math.min(Math.max(1, params.limit ?? DEFAULT_LIMIT), MAX_LIMIT);
-  const where = buildProductWhere(userId, {
+  const householdId = await getHouseholdIdForUser(userId);
+  const where = buildProductWhere(userId, householdId, {
     q: params.q,
     status: params.status ?? "all",
   });
@@ -150,37 +148,59 @@ export async function listProductsForUser(
   };
 }
 
+const productExportSelect = {
+  id: true,
+  name: true,
+  brand: true,
+  model: true,
+  category: true,
+  retailer: true,
+  serialNumber: true,
+  invoiceNumber: true,
+  purchaseAmount: true,
+  purchaseDate: true,
+  warrantyExpiry: true,
+  extendedExpiry: true,
+  extendedType: true,
+  notes: true,
+} satisfies Prisma.ProductSelect;
+
+export async function listProductsForExport(userId: string, productId?: string) {
+  const householdId = await getHouseholdIdForUser(userId);
+  const vault = vaultProductWhere(userId, householdId);
+
+  return prisma.product.findMany({
+    where: productId
+      ? { AND: [{ id: productId }, vault] }
+      : vault,
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    select: productExportSelect,
+  });
+}
+
 export async function getDashboardCounts(userId: string) {
   const { today, in30 } = getReminderWindowDates();
+  const householdId = await getHouseholdIdForUser(userId);
+  const vault = vaultProductWhere(userId, householdId);
 
   const [totalProducts, activeProducts, expiringProducts, expiredProducts] =
     await Promise.all([
       prisma.product.count({
-        where: { userId },
+        where: vault,
       }),
       prisma.product.count({
         where: {
-          userId,
-          warrantyExpiry: {
-            gt: in30,
-          },
+          AND: [vault, productStatusWhere("active", today, in30) ?? {}],
         },
       }),
       prisma.product.count({
         where: {
-          userId,
-          warrantyExpiry: {
-            gte: today,
-            lte: in30,
-          },
+          AND: [vault, productStatusWhere("expiring", today, in30) ?? {}],
         },
       }),
       prisma.product.count({
         where: {
-          userId,
-          warrantyExpiry: {
-            lt: today,
-          },
+          AND: [vault, productStatusWhere("expired", today, in30) ?? {}],
         },
       }),
     ]);

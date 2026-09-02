@@ -1,5 +1,6 @@
 import type { ExtractedDocumentFields } from "@/lib/document-extract/types";
 import type { RetailerId } from "@/lib/document-extract/aliases";
+import { isValidImei } from "@/lib/document-extract/validate";
 
 /**
  * Retailer-specific boosters for popular Indian invoice formats.
@@ -60,7 +61,7 @@ export function boostInvoiceNumber(text: string, retailer: RetailerId) {
 }
 
 export function boostSerialNumber(text: string) {
-  return firstMatch(text, [
+  const value = firstMatch(text, [
     // Flipkart style: [IMEI/Serial No: 356805361134937 ]
     /\[?\s*imei\s*\/\s*serial\s*(?:no|number)?\s*[:\-]?\s*([A-Z0-9]{8,})\s*\]?/i,
     /imei(?:\s*(?:no|number|#|1|2))?\s*[:\-]?\s*([0-9]{10,20})/i,
@@ -68,6 +69,15 @@ export function boostSerialNumber(text: string) {
     /s\/n\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-\/]{4,40})/i,
     /sr\.?\s*no\.?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-\/]{4,40})/i,
   ]);
+
+  if (!value) return "";
+
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 15) {
+    return isValidImei(digits) ? digits : "";
+  }
+
+  return value;
 }
 
 export function boostPurchaseDateRaw(text: string, retailer: RetailerId) {

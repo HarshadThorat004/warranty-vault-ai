@@ -9,10 +9,25 @@ const documentSchema = z.object({
 const baseProductFields = {
   name: z.string().min(1, "Product name is required").max(200),
   brand: z.string().max(100).optional().nullable(),
+  model: z.string().max(120).optional().nullable(),
+  category: z.string().max(40).optional().nullable(),
+  retailer: z.string().max(80).optional().nullable(),
   serialNumber: z.string().max(100).optional().nullable(),
   invoiceNumber: z.string().max(100).optional().nullable(),
+  purchaseAmount: z
+    .string()
+    .max(20)
+    .optional()
+    .nullable()
+    .refine(
+      (value) =>
+        !value || /^\d{1,10}(\.\d{1,2})?$/.test(value.replace(/,/g, "").trim()),
+      "Enter a valid amount"
+    ),
   purchaseDate: z.string().min(1, "Purchase date is required"),
   warrantyExpiry: z.string().min(1, "Warranty expiry is required"),
+  extendedExpiry: z.string().optional().nullable(),
+  extendedType: z.string().max(40).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   renewalAvailable: z.boolean().optional(),
   renewalNotes: z.string().max(500).optional().nullable(),
@@ -21,7 +36,11 @@ const baseProductFields = {
 };
 
 function refineDates(
-  data: { purchaseDate: string; warrantyExpiry: string },
+  data: {
+    purchaseDate: string;
+    warrantyExpiry: string;
+    extendedExpiry?: string | null;
+  },
   ctx: z.RefinementCtx
 ) {
   const purchase = new Date(data.purchaseDate);
@@ -54,6 +73,23 @@ function refineDates(
       path: ["warrantyExpiry"],
     });
   }
+
+  if (data.extendedExpiry) {
+    const extended = new Date(data.extendedExpiry);
+    if (Number.isNaN(extended.getTime())) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Invalid extended cover date",
+        path: ["extendedExpiry"],
+      });
+    } else if (!Number.isNaN(purchase.getTime()) && extended < purchase) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Extended cover must be on or after purchase date",
+        path: ["extendedExpiry"],
+      });
+    }
+  }
 }
 
 export const productCreateSchema = z
@@ -72,6 +108,7 @@ export const productUpdateSchema = z
         {
           purchaseDate: data.purchaseDate,
           warrantyExpiry: data.warrantyExpiry,
+          extendedExpiry: data.extendedExpiry,
         },
         ctx
       );

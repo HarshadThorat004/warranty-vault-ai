@@ -74,12 +74,19 @@ export default async function EditPage({ params }: Props) {
               defaultValues={{
                 name: product.name,
                 brand: product.brand || "",
+                model: product.model || "",
+                category: product.category || "",
+                retailer: product.retailer || "",
                 serialNumber: product.serialNumber || "",
                 invoiceNumber: product.invoiceNumber || "",
+                purchaseAmount: product.purchaseAmount || "",
                 purchaseDate:
                   product.purchaseDate?.toISOString().split("T")[0] || "",
                 warrantyExpiry:
                   product.warrantyExpiry?.toISOString().split("T")[0] || "",
+                extendedExpiry:
+                  product.extendedExpiry?.toISOString().split("T")[0] || "",
+                extendedType: product.extendedType || "store",
                 notes: product.notes || "",
                 renewalAvailable: product.renewalAvailable,
                 renewalNotes: product.renewalNotes || "",

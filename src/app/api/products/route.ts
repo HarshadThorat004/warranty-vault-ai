@@ -1,5 +1,6 @@
 import { jsonError, jsonSuccess } from "@/lib/api";
 import { listProductsForUser, parseProductListParams } from "@/lib/products-query";
+import { getHouseholdIdForUser } from "@/lib/household";
 import { getSessionUser } from "@/lib/product-access";
 import { prisma } from "@/lib/prisma";
 import { productCreateSchema } from "@/lib/validations/product";
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
       return jsonError("Unauthorized", 401);
     }
 
+    const householdId = await getHouseholdIdForUser(user.id);
+
     const body = await req.json();
     const parsed = productCreateSchema.safeParse(body);
 
@@ -48,15 +51,26 @@ export async function POST(req: Request) {
       data: {
         name: data.name,
         brand: data.brand || null,
+        model: data.model || null,
+        category: data.category || null,
+        retailer: data.retailer || null,
         serialNumber: data.serialNumber || null,
         invoiceNumber: data.invoiceNumber || null,
+        purchaseAmount: data.purchaseAmount?.replace(/,/g, "").trim() || null,
         purchaseDate: new Date(data.purchaseDate),
         warrantyExpiry: new Date(data.warrantyExpiry),
+        extendedExpiry: data.extendedExpiry
+          ? new Date(data.extendedExpiry)
+          : null,
+        extendedType: data.extendedExpiry
+          ? data.extendedType?.trim() || "store"
+          : null,
         invoiceImage: data.invoiceImage || null,
         notes: data.notes || null,
         renewalAvailable: data.renewalAvailable ?? false,
         renewalNotes: data.renewalNotes || null,
         userId: user.id,
+        householdId,
         documents:
           data.documents && data.documents.length > 0
             ? {

@@ -64,14 +64,24 @@ export async function PUT(
       data: {
         name: data.name,
         brand: data.brand ?? null,
+        model: data.model ?? null,
+        category: data.category ?? null,
+        retailer: data.retailer ?? null,
         serialNumber: data.serialNumber ?? null,
         invoiceNumber: data.invoiceNumber ?? null,
+        purchaseAmount: data.purchaseAmount?.replace(/,/g, "").trim() || null,
         purchaseDate: data.purchaseDate
           ? new Date(data.purchaseDate)
           : undefined,
         warrantyExpiry: data.warrantyExpiry
           ? new Date(data.warrantyExpiry)
           : undefined,
+        extendedExpiry: data.extendedExpiry
+          ? new Date(data.extendedExpiry)
+          : null,
+        extendedType: data.extendedExpiry
+          ? data.extendedType?.trim() || "store"
+          : null,
         notes: data.notes ?? null,
         renewalAvailable: data.renewalAvailable ?? false,
         renewalNotes: data.renewalNotes ?? null,

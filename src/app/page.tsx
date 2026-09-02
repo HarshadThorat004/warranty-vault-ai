@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import BrandLogo from "@/components/brand-logo";
+import SiteFooter from "@/components/site-footer";
 
 export default function HomePage() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -96,11 +97,11 @@ export default function HomePage() {
             Your warranty. Our responsibility.
           </p>
           <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-tight md:text-6xl">
-            Never lose track of a warranty again
+            GST invoices in a vault you can take to a service centre
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-gray-500 md:text-base">
-            Store invoices, track expiry dates, and get reminders — in a simple
-            vault built for everyday use.
+            Scan Amazon, Flipkart, and Croma bills, track manufacturer vs store
+            cover, and download a claim pack before you visit the desk.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -135,18 +136,18 @@ export default function HomePage() {
           {[
             {
               icon: <FileText size={18} />,
-              title: "Document storage",
-              desc: "Keep invoices and warranty cards organized for every product.",
+              title: "Claim pack",
+              desc: "Invoice facts, serial, and a service-centre checklist in one PDF.",
             },
             {
               icon: <Bell size={18} />,
-              title: "Smart reminders",
-              desc: "Get notified before coverage expires so nothing slips by.",
+              title: "Reminders that land",
+              desc: "Email and browser alerts at 30 days, 7 days, and the day before cover ends.",
             },
             {
               icon: <Sparkles size={18} />,
-              title: "Document scanning",
-              desc: "Upload an invoice or warranty card and auto-fill available fields.",
+              title: "GST-aware scan",
+              desc: "QR first, then on-device OCR — English and Hindi labels, empty if unsure.",
             },
           ].map((feature) => (
             <div
@@ -164,6 +165,8 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      <SiteFooter />
     </main>
   );
 }

@@ -1,6 +1,10 @@
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
+import {
+  getHouseholdIdForUser,
+  vaultProductWhere,
+} from "@/lib/household";
 import { prisma } from "@/lib/prisma";
 
 export async function getSessionUser() {
@@ -24,17 +28,19 @@ export async function getSessionUser() {
   return user;
 }
 
-export async function assertProductOwner(productId: string) {
+export async function assertProductAccess(productId: string) {
   const user = await getSessionUser();
 
   if (!user) {
     return { error: "Unauthorized" as const, status: 401 as const, user: null, product: null };
   }
 
+  const householdId = await getHouseholdIdForUser(user.id);
+
   const product = await prisma.product.findFirst({
     where: {
       id: productId,
-      userId: user.id,
+      AND: [vaultProductWhere(user.id, householdId)],
     },
     include: {
       documents: true,
@@ -46,4 +52,9 @@ export async function assertProductOwner(productId: string) {
   }
 
   return { error: null, status: 200 as const, user, product };
+}
+
+/** @deprecated Use assertProductAccess — household members share the vault. */
+export async function assertProductOwner(productId: string) {
+  return assertProductAccess(productId);
 }

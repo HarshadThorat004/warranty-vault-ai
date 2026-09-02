@@ -1,6 +1,7 @@
 import { jsonError, jsonSuccess } from "@/lib/api";
 import {
   SCAN_FAILED_MESSAGE,
+  scanDocumentFromText,
   scanDocumentFromUrl,
 } from "@/lib/document-extract";
 import { getSessionUser } from "@/lib/product-access";
@@ -26,15 +27,20 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { imageUrl } = body;
+    const text = typeof body.text === "string" ? body.text : "";
+    const qrPayload = typeof body.qrPayload === "string" ? body.qrPayload : "";
+    const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : "";
 
-    if (!imageUrl || typeof imageUrl !== "string") {
-      return jsonError("imageUrl is required", 400);
+    let result;
+
+    if (text.trim()) {
+      result = scanDocumentFromText(text, qrPayload || null);
+    } else if (imageUrl) {
+      assertAllowedRemoteUrl(imageUrl);
+      result = await scanDocumentFromUrl(imageUrl);
+    } else {
+      return jsonError("imageUrl or text is required", 400);
     }
-
-    assertAllowedRemoteUrl(imageUrl);
-
-    const result = await scanDocumentFromUrl(imageUrl);
 
     return jsonSuccess({
       success: true,

@@ -9,10 +9,16 @@ export interface Product {
   id: string;
   name: string;
   brand: string | null;
+  model?: string | null;
+  category?: string | null;
+  retailer?: string | null;
   serialNumber?: string | null;
   invoiceNumber?: string | null;
+  purchaseAmount?: string | null;
   purchaseDate: Date | null;
   warrantyExpiry: Date | null;
+  extendedExpiry?: Date | null;
+  extendedType?: string | null;
   invoiceImage: string | null;
   notes?: string | null;
   renewalAvailable?: boolean;
