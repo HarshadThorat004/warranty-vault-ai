@@ -19,3 +19,20 @@ export async function deleteUploadedFiles(urls: Array<string | null | undefined>
     console.error("UPLOADTHING_DELETE_ERROR", error);
   }
 }
+
+export async function uploadInboundFile(input: {
+  buffer: Buffer;
+  filename: string;
+  mimeType: string;
+}) {
+  const file = new File([new Uint8Array(input.buffer)], input.filename, {
+    type: input.mimeType,
+  });
+  const result = await utapi.uploadFiles(file);
+
+  if (result.error || !result.data) {
+    throw new Error(result.error?.message || "Could not store inbound file");
+  }
+
+  return result.data.ufsUrl || result.data.url;
+}

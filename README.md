@@ -154,6 +154,16 @@ CRON_SECRET=your-random-secret
 | `RESEND_DAILY_LIMIT` | App-side buffer under Resend free daily quota (default 95) |
 | `CRON_SECRET` | Protects `/api/cron/reminders` and `/api/cron/test-email` |
 
+### Email-forward inbox (optional)
+
+Forward Amazon/Flipkart invoice PDFs to a per-user address such as `ab2dk4xq@inbound.warrantyvault.in`. The file is stored as a **draft**. Nothing becomes a live product until you review it.
+
+1. Add **MX only** on `inbound.warrantyvault.in` in Resend Receiving. Leave root `warrantyvault.in` mail (Gmail, etc.) unchanged.
+2. Webhook URL: `https://<your-domain>/api/inbound/resend` for event `email.received`.
+3. Set `INBOUND_EMAIL_DOMAIN=inbound.warrantyvault.in` and `RESEND_WEBHOOK_SECRET`.
+
+Each signed-in user copies their address from **Settings**.
+
 **Important:** Resend cannot send *from* `@gmail.com`. Until the domain is verified, you may temporarily use:
 
 ```bash

@@ -6,6 +6,7 @@ import Breadcrumbs from "@/components/breadcrumbs";
 import DashboardShell from "@/components/dashboard-shell";
 import DeleteAccountButton from "@/components/delete-account-button";
 import HouseholdSettings from "@/components/household-settings";
+import InboundSettings from "@/components/inbound-settings";
 import PushToggle from "@/components/push-toggle";
 import { getHouseholdIdForUser, vaultProductWhere } from "@/lib/household";
 import { getSessionUser } from "@/lib/product-access";
@@ -77,6 +78,8 @@ export default async function SettingsPage() {
         </section>
 
         <HouseholdSettings currentUserId={user.id} />
+
+        <InboundSettings />
 
         <section className="rounded-2xl border border-white/10 bg-neutral-950/80 p-6 md:p-8">
           <div className="flex items-start gap-3">

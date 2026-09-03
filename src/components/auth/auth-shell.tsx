@@ -91,7 +91,7 @@ export default function AuthShell({
 
       <div
         className={`relative z-10 mx-auto flex min-h-screen flex-col justify-center px-4 py-16 ${
-          wide ? "max-w-2xl" : "max-w-[380px]"
+          wide ? "max-w-3xl" : "max-w-[380px]"
         }`}
       >
         {children}

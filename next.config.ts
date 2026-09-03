@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     "sharp",
     "pdf-lib",
     "web-push",
+    "resend",
   ],
   images: {
     remotePatterns: [

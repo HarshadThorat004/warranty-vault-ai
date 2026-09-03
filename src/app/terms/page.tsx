@@ -6,8 +6,11 @@ import AuthShell, { AuthBrandMark } from "@/components/auth/auth-shell";
 
 export const metadata: Metadata = {
   title: "Terms of Service — Warranty Vault AI",
-  description: "Terms of Service for Warranty Vault AI",
+  description:
+    "Terms of Service for Warranty Vault AI, including accounts, scanning, email-forward, household vaults, and liability limits.",
 };
+
+const CONTACT = "warrantyvault.in@gmail.com";
 
 function Section({
   title,
@@ -24,6 +27,17 @@ function Section({
   );
 }
 
+function MailLink() {
+  return (
+    <a
+      href={`mailto:${CONTACT}`}
+      className="text-white/80 underline decoration-white/25 underline-offset-2"
+    >
+      {CONTACT}
+    </a>
+  );
+}
+
 export default function TermsPage() {
   return (
     <AuthShell wide>
@@ -33,207 +47,324 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-2 text-sm text-white/40">
-          Last updated: August 4, 2026
+          Last updated: September 3, 2026
         </p>
       </div>
 
       <div className="mt-10 space-y-8">
         <p className="text-sm leading-7 text-white/55">
-          These Terms of Service (&quot;Terms&quot;) govern your access to and
-          use of Warranty Vault AI, including the website, application, and
-          related services operated at warrantyvault.in (collectively, the
-          &quot;Service&quot;). By creating an account or using the Service, you
-          agree to these Terms. If you do not agree, do not use the Service.
+          These Terms of Service (&quot;Terms&quot;) are a binding agreement
+          between you and the operator of Warranty Vault AI
+          (&quot;Warranty Vault,&quot; &quot;we,&quot; &quot;us&quot;) for the
+          website, application, and related services at warrantyvault.in (the
+          &quot;Service&quot;). By creating an account, signing in, or using
+          the Service, you agree to these Terms and to our{" "}
+          <Link
+            href="/privacy"
+            className="text-white/80 underline decoration-white/25 underline-offset-2"
+          >
+            Privacy Policy
+          </Link>
+          . If you do not agree, do not use the Service.
         </p>
         <p className="text-sm leading-7 text-white/40">
-          These pages are provided as a practical template for an early-stage
-          product and are not a substitute for advice from a qualified attorney.
+          This is a practical template for an early-stage product in India. It
+          is not legal advice and does not replace counsel.
         </p>
 
         <Section title="1. Who we are">
           <p>
-            Warranty Vault AI is a product tool that helps you store product
-            warranty information, receipts, related documents, and expiry
-            reminders. References to &quot;we,&quot; &quot;us,&quot; or
-            &quot;Warranty Vault AI&quot; mean the operator of the Service at
-            warrantyvault.in.
+            Warranty Vault is a personal warranty vault. It helps you store
+            product details, GST invoices, warranty cards, and related files,
+            scan those documents to autofill forms, share a family vault, and
+            receive expiry reminders. It is not a manufacturer, retailer,
+            insurer, claims agent, or law firm.
           </p>
           <p>
-            Questions about these Terms:{" "}
-            <a
-              href="mailto:warrantyvault.in@gmail.com"
-              className="text-white/80 underline decoration-white/25 underline-offset-2"
-            >
-              warrantyvault.in@gmail.com
-            </a>
-            .
+            Questions: <MailLink />.
           </p>
         </Section>
 
         <Section title="2. Eligibility">
           <p>
-            You must be at least 18 years old and capable of forming a binding
-            contract to use the Service. By using the Service, you represent that
-            you meet these requirements.
+            You must be at least 18 years old and able to form a binding
+            contract under the laws of India to use the Service. By using the
+            Service you represent that you meet these requirements. Household
+            invites may only be sent to people who are 18 or older.
           </p>
         </Section>
 
         <Section title="3. Accounts and security">
           <p>
-            You may sign up using Google OAuth, email and password, or email
-            one-time passcodes (OTP). You are responsible for maintaining the
-            confidentiality of your credentials and for all activity under your
-            account. Notify us promptly if you suspect unauthorized access.
+            You may register with Google, email and password, or an email
+            one-time passcode (OTP). You are responsible for your credentials,
+            for access to the inbox used for OTP and reminders, and for all
+            activity on your account. Tell us promptly if you suspect
+            unauthorized access.
           </p>
           <p>
-            Provide accurate account information and keep it up to date. We may
-            suspend or terminate accounts that appear compromised, abusive, or
-            in violation of these Terms.
+            Keep account details accurate. We may suspend or close accounts
+            that appear compromised, abusive, inactive for a long period, or in
+            breach of these Terms.
           </p>
         </Section>
 
-        <Section title="4. The Service — important limits">
+        <Section title="4. The Service">
+          <p>Depending on the features we enable, the Service may let you:</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              Store products, serials, invoice numbers, purchase amounts, notes,
+              and manufacturer or store/extended cover dates
+            </li>
+            <li>
+              Upload invoices, warranty cards, and photos, and scan them to
+              suggest form fields
+            </li>
+            <li>
+              Forward marketplace invoice PDFs to a personal inbound address
+              and review them as drafts before they become products
+            </li>
+            <li>
+              Invite household members to a shared family vault (up to five
+              people)
+            </li>
+            <li>
+              Receive email reminders (including about 30 days, 7 days, and the
+              last day of cover), in-app notices, optional browser push, and
+              calendar or CSV exports
+            </li>
+            <li>Download a claim pack of the facts you stored for a product</li>
+          </ul>
           <p>
-            Warranty Vault AI helps you organize warranty-related records and
-            send reminders. It is <strong className="font-medium text-white/80">not</strong>{" "}
-            legal advice, insurance, a warranty provider, or a claims agent.
-          </p>
-          <p>
-            Any warranty, guarantee, or consumer-protection claim remains between
-            you and the manufacturer, retailer, or other party that issued the
-            warranty. We do not guarantee that stored details are complete,
-            accurate, or sufficient for a claim, and we do not control third-party
-            warranty outcomes.
+            Features may change, be limited by capacity (for example email
+            quotas), or be unavailable in some regions or browsers.
           </p>
         </Section>
 
-        <Section title="5. Your content">
+        <Section title="5. Important limits">
           <p>
-            You retain ownership of content you upload or enter into the Service,
-            including product details, receipt images, warranty documents, notes,
-            and related metadata (&quot;User Content&quot;).
+            The Service is a record-keeping and reminder tool. It is{" "}
+            <strong className="font-medium text-white/80">not</strong> legal
+            advice, insurance, a warranty, a guarantee, or a claims service.
           </p>
           <p>
-            You grant us a limited license to host, process, display, and
-            transmit User Content solely as needed to operate and improve the
-            Service (for example, storing files, running OCR on invoices, and
-            sending reminder emails you enable).
+            Any warranty, guarantee, return, or consumer-protection claim stays
+            between you and the manufacturer, retailer, marketplace, or other
+            issuer. We do not file claims, contact service centres on your
+            behalf, or control third-party outcomes.
           </p>
           <p>
-            You represent that you have the rights to upload User Content and
-            that it does not infringe others&apos; rights or violate law.
+            Scan results, suggested dates, and extracted fields can be wrong or
+            incomplete. Prefer a blank field over a guessed expiry. You must
+            check every date and serial before you rely on a reminder or a
+            claim pack. We do not warrant that stored details are enough to
+            prove ownership or to succeed on a claim.
           </p>
         </Section>
 
-        <Section title="6. Acceptable use">
+        <Section title="6. Email-forward inbox">
+          <p>
+            If inbound receiving is live, Settings shows a personal address on
+            inbound.warrantyvault.in. Forward Amazon, Flipkart, or similar
+            invoice PDFs or images to that address. We store usable PDF/JPEG/PNG
+            attachments as a <strong className="font-medium text-white/80">draft</strong>.
+            Nothing becomes a live product until you review and save it. We do
+            not fetch invoice links from an email body; attach the file.
+          </p>
+          <p>
+            Anyone who knows the address can send mail to it. Treat it as
+            private. Do not publish it. We may reject oversized files,
+            non-document types, duplicates, or abuse. Drafts may include the
+            sender address, subject, and attachments. If you share a household
+            vault, members may see those drafts.
+          </p>
+        </Section>
+
+        <Section title="7. Household vaults">
+          <p>
+            A household is a shared family vault, not a company workspace.
+            Invite only people you trust. Members can see shared products,
+            documents, reminder status, and inbound drafts, including personal
+            data printed on invoices (name, address, phone, GSTIN).
+          </p>
+          <p>
+            Owners can invite, rename the vault, and manage membership. Members
+            can add and edit products. Leaving or deleting your account does
+            not erase other members&apos; copies of the shared vault. If you
+            are the last remaining member, deletion of your account also
+            removes that vault&apos;s products and files.
+          </p>
+        </Section>
+
+        <Section title="8. Your content">
+          <p>
+            You keep ownership of content you upload or enter, including product
+            details, files, notes, forwarded emails, and related metadata
+            (&quot;User Content&quot;).
+          </p>
+          <p>
+            You grant us a worldwide, non-exclusive licence to host, process,
+            display, transmit, and delete User Content only as needed to run
+            the Service — for example storing files, running OCR or GST QR
+            decode, sending reminders you use, sharing with household members
+            you invite, and exporting files you request.
+          </p>
+          <p>
+            You represent that you have the rights to upload User Content, that
+            it is lawful, and that it does not infringe others&apos; rights. Do
+            not upload other people&apos;s invoices or identity documents
+            without authority.
+          </p>
+        </Section>
+
+        <Section title="9. Acceptable use">
           <p>You agree not to:</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>Use the Service for unlawful, fraudulent, or harmful purposes</li>
-            <li>Attempt to access other users&apos; accounts or data</li>
-            <li>Upload malware, or content you have no right to share</li>
+            <li>Access another user&apos;s account, inbound address, or data</li>
             <li>
-              Probe, scan, or disrupt the Service, or reverse engineer it except
-              where permitted by law
+              Upload malware, or content you have no right to share
             </li>
             <li>
-              Abuse email/OTP, reminder, or authentication features (including
-              spam or automated abuse)
+              Probe, overload, or disrupt the Service, or reverse engineer it
+              except where Indian law allows
             </li>
             <li>
-              Misrepresent the Service as a legal advisor, insurer, or warranty
-              issuer
+              Abuse OTP, reminder, inbound, invite, or authentication features
+              (including spam or automated abuse)
             </li>
+            <li>
+              Present the Service as a lawyer, insurer, manufacturer, or
+              warranty issuer
+            </li>
+            <li>Invite minors or share a vault with anyone under 18</li>
           </ul>
         </Section>
 
-        <Section title="7. Third-party services">
+        <Section title="10. Third-party services">
           <p>
-            The Service relies on third-party providers, which may include Google
-            (sign-in), Resend (transactional email such as OTP and reminders),
-            UploadThing (file storage), hosting providers (for example Vercel),
-            database hosting for Postgres, and AI/OCR providers (for example
-            Google Gemini) for receipt or document text extraction. Their terms
-            and privacy practices also apply to their processing.
+            The Service depends on providers whose own terms also apply,
+            including Google (sign-in), Resend (OTP, reminders, and inbound
+            receiving), UploadThing (file storage), hosting such as Vercel,
+            PostgreSQL hosting, and — only if we turn it on for the Service —
+            an optional cloud AI extractor such as Google Gemini. We are not
+            responsible for those providers&apos; outages or policy changes.
           </p>
         </Section>
 
-        <Section title="8. Intellectual property">
+        <Section title="11. Fees">
           <p>
-            The Service, including its software, design, branding, and
-            documentation (excluding User Content), is owned by Warranty Vault AI
-            or its licensors. You may not copy, modify, or distribute our
-            materials except as allowed by these Terms or with prior written
-            permission.
+            The Service is currently offered free of charge, subject to fair
+            use and provider limits (for example daily email caps). We may
+            introduce paid plans or usage limits later. If we do, we will post
+            the change and, where required, ask you to accept new terms before
+            charging you.
           </p>
         </Section>
 
-        <Section title="9. Disclaimers">
+        <Section title="12. Intellectual property">
+          <p>
+            The Service — including software, design, branding, and
+            documentation, but excluding User Content — is owned by Warranty
+            Vault or its licensors. You may not copy, modify, or distribute our
+            materials except as these Terms allow or with prior written
+            permission. Feedback you send us may be used to improve the Service
+            without obligation to you.
+          </p>
+        </Section>
+
+        <Section title="13. Disclaimers">
           <p>
             THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS
-            AVAILABLE.&quot; TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM
-            ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY,
-            FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. We do not
-            warrant that the Service will be uninterrupted, error-free, or that
-            OCR/extraction results will be accurate.
+            AVAILABLE.&quot; TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE
+            DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING
+            MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+            NON-INFRINGEMENT. We do not warrant uninterrupted access, error-free
+            operation, or accurate OCR, QR, or AI extraction.
           </p>
         </Section>
 
-        <Section title="10. Limitation of liability">
+        <Section title="14. Limitation of liability">
           <p>
-            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WARRANTY VAULT AI
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WARRANTY VAULT
             AND ITS OPERATORS WILL NOT BE LIABLE FOR INDIRECT, INCIDENTAL,
             SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR LOST PROFITS,
-            DATA, OR BUSINESS OPPORTUNITIES, ARISING FROM YOUR USE OF THE
-            SERVICE. OUR TOTAL LIABILITY FOR CLAIMS RELATING TO THE SERVICE WILL
-            NOT EXCEED THE GREATER OF (A) THE AMOUNTS YOU PAID US FOR THE SERVICE
+            DATA, CLAIMS, OR BUSINESS OPPORTUNITIES, ARISING FROM YOUR USE OF
+            THE SERVICE — INCLUDING A MISSED WARRANTY WINDOW, A WRONG EXTRACTED
+            DATE, OR A FAILED THIRD-PARTY CLAIM.
+          </p>
+          <p>
+            OUR TOTAL LIABILITY FOR CLAIMS RELATING TO THE SERVICE WILL NOT
+            EXCEED THE GREATER OF (A) THE AMOUNTS YOU PAID US FOR THE SERVICE
             IN THE TWELVE (12) MONTHS BEFORE THE CLAIM OR (B) INR 5,000.
           </p>
           <p>
-            Some jurisdictions do not allow certain limitations; in those cases,
-            our liability is limited to the fullest extent permitted by law.
+            Nothing in these Terms limits liability that cannot be limited
+            under Indian law, including liability for fraud or for death or
+            personal injury caused by negligence where such a limit is void.
+            Mandatory consumer protections that apply to you still apply.
           </p>
         </Section>
 
-        <Section title="11. Termination">
+        <Section title="15. Indemnity">
           <p>
-            You may stop using the Service at any time. We may suspend or
-            terminate access if you violate these Terms, if required by law, or
-            if we discontinue the Service. Upon termination, your right to use
-            the Service ends. Provisions that by nature should survive
-            (including disclaimers, limitations of liability, and governing law)
-            will survive.
+            You will defend and indemnify us against claims, losses, and
+            reasonable costs arising from your User Content, your household
+            invites, your misuse of an inbound address, or your breach of these
+            Terms, except to the extent caused by our wilful misconduct.
           </p>
         </Section>
 
-        <Section title="12. Changes">
+        <Section title="16. Suspension, termination, and deletion">
           <p>
-            We may update these Terms from time to time. We will post the updated
-            version with a revised &quot;Last updated&quot; date. Continued use
-            after changes become effective constitutes acceptance of the updated
-            Terms, except where applicable law requires additional notice or
-            consent.
+            You may stop using the Service at any time and delete your account
+            in Settings. Deletion removes your account and, if you are the last
+            person in the vault, its products, inbound drafts, and files.
+            Household products stay with remaining members. Backups may retain
+            residual copies for a short period.
+          </p>
+          <p>
+            We may suspend or terminate access if you violate these Terms, if
+            required by law, to protect the Service, or if we discontinue it.
+            Licence grants, disclaimers, liability limits, indemnity, and
+            governing law survive termination.
           </p>
         </Section>
 
-        <Section title="13. Governing law">
+        <Section title="17. Changes">
+          <p>
+            We may update these Terms. We will post the new version with a
+            revised &quot;Last updated&quot; date. Material changes may also be
+            sent by email or shown in the product. Continued use after the
+            effective date is acceptance, except where law requires extra notice
+            or consent.
+          </p>
+        </Section>
+
+        <Section title="18. Governing law and disputes">
           <p>
             These Terms are governed by the laws of India, without regard to
-            conflict-of-law principles. Subject to mandatory consumer protections
-            that may apply where you live, courts in India will have exclusive
-            jurisdiction over disputes arising from these Terms or the Service.
+            conflict-of-law rules. Subject to mandatory consumer protections
+            where you live, courts of competent jurisdiction in India have
+            exclusive jurisdiction over disputes arising from these Terms or
+            the Service.
           </p>
         </Section>
 
-        <Section title="14. Contact">
+        <Section title="19. General">
           <p>
-            For questions about these Terms, contact{" "}
-            <a
-              href="mailto:warrantyvault.in@gmail.com"
-              className="text-white/80 underline decoration-white/25 underline-offset-2"
-            >
-              warrantyvault.in@gmail.com
-            </a>
-            .
+            These Terms and the Privacy Policy are the entire agreement for the
+            Service. If a provision is unenforceable, the rest remains in
+            effect. Our failure to enforce a provision is not a waiver. You may
+            not assign these Terms without our consent; we may assign them in
+            connection with a reorganization or sale of the Service. There are
+            no third-party beneficiaries. Headings are for convenience only.
+          </p>
+        </Section>
+
+        <Section title="20. Contact">
+          <p>
+            For these Terms: <MailLink />.
           </p>
         </Section>
       </div>

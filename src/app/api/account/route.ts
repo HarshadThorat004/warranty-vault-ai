@@ -6,6 +6,7 @@ import {
   collectAccountDeletionFiles,
   detachUserFromHouseholdForDeletion,
 } from "@/lib/household";
+import { collectInboundDraftFiles } from "@/lib/inbound";
 import { getSessionUser } from "@/lib/product-access";
 import { prisma } from "@/lib/prisma";
 import { consumeRateLimit } from "@/lib/rate-limit";
@@ -40,7 +41,11 @@ export async function DELETE(req: Request) {
     }
 
     const deletion = await collectAccountDeletionFiles(user.id);
-    const fileUrls = collectProductFileUrls(deletion.products);
+    const inboundUrls = await collectInboundDraftFiles(user.id);
+    const fileUrls = [
+      ...collectProductFileUrls(deletion.products),
+      ...inboundUrls,
+    ];
 
     await detachUserFromHouseholdForDeletion(user.id);
 

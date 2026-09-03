@@ -46,11 +46,10 @@ export function scanDocumentFromText(
   return merged;
 }
 
-export async function scanDocumentFromUrl(
-  url: string
+export async function scanDocumentFromBuffer(
+  buffer: Buffer,
+  mimeType: string
 ): Promise<ExtractedDocumentFields> {
-  const { buffer, mimeType } = await fetchDocumentBuffer(url);
-
   let qrFields: ExtractedDocumentFields | null = null;
 
   if (mimeType.startsWith("image/")) {
@@ -82,4 +81,11 @@ export async function scanDocumentFromUrl(
   }
 
   return merged;
+}
+
+export async function scanDocumentFromUrl(
+  url: string
+): Promise<ExtractedDocumentFields> {
+  const { buffer, mimeType } = await fetchDocumentBuffer(url);
+  return scanDocumentFromBuffer(buffer, mimeType);
 }

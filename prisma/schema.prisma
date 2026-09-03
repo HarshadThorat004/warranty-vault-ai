@@ -20,6 +20,8 @@ model User {
   pushSubscriptions PushSubscription[]
   householdMembership HouseholdMember?
   householdInvitesSent HouseholdInvite[]
+  inboundSlug         String?            @unique
+  inboundDrafts       InboundDraft[]
 }
 
 model EmailOtp {
@@ -68,6 +70,25 @@ model Product {
   @@index([userId, warrantyExpiry])
 }
 
+model InboundDraft {
+  id                String    @id @default(cuid())
+  userId            String
+  householdId       String?
+  status            String    @default("pending")
+  fromEmail         String?
+  subject           String?
+  resendEmailId     String?   @unique
+  extracted         Json?
+  files             Json?
+  acceptedProductId String?
+  createdAt         DateTime  @default(now())
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household         Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([householdId, status])
+}
+
 model Household {
   id        String             @id @default(cuid())
   name      String             @default("Family vault")
@@ -75,6 +96,7 @@ model Household {
   members   HouseholdMember[]
   invites   HouseholdInvite[]
   products  Product[]
+  inboundDrafts InboundDraft[]
 }
 
 model HouseholdMember {

@@ -129,8 +129,10 @@ type DocumentType = {
 type ProductFormProps = {
   mode: "create" | "edit";
   productId?: string;
+  inboundDraftId?: string;
   defaultValues?: Partial<FormValues> & {
     documents?: DocumentType[];
+    invoiceImage?: string | null;
   };
 };
 
@@ -174,6 +176,7 @@ function ScanBadge({
 export default function ProductForm({
   mode,
   productId,
+  inboundDraftId,
   defaultValues,
 }: ProductFormProps) {
   const router = useRouter();
@@ -219,7 +222,8 @@ export default function ProductForm({
       invoiceNumber: defaultValues?.invoiceNumber ?? "",
       purchaseAmount: defaultValues?.purchaseAmount ?? "",
       purchaseDate:
-        defaultValues?.purchaseDate || (mode === "create" ? todayIso() : ""),
+        defaultValues?.purchaseDate ||
+        (mode === "create" && !inboundDraftId ? todayIso() : ""),
       warrantyExpiry: defaultValues?.warrantyExpiry ?? "",
       extendedExpiry: defaultValues?.extendedExpiry ?? "",
       extendedType: defaultValues?.extendedType || "store",
@@ -561,6 +565,10 @@ export default function ProductForm({
         renewalNotes: values.renewalNotes || null,
         renewalAvailable: values.renewalAvailable ?? false,
         documents,
+        invoiceImage:
+          defaultValues?.invoiceImage ||
+          documents.find((doc) => doc.fileType !== "pdf")?.fileUrl ||
+          null,
       };
 
       const response = await fetch(
@@ -584,6 +592,17 @@ export default function ProductForm({
             "Something went wrong"
         );
         return;
+      }
+
+      if (inboundDraftId && result.id) {
+        await fetch(`/api/inbound/drafts/${inboundDraftId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "accepted",
+            productId: result.id,
+          }),
+        }).catch(() => undefined);
       }
 
       toast.success(

@@ -7,6 +7,7 @@ import {
   Plus,
   Download,
   CalendarDays,
+  Inbox,
 } from "lucide-react";
 
 import AnimatedCounter from "@/components/animated-counter";
@@ -20,6 +21,7 @@ import {
   getEffectiveCover,
 } from "@/lib/coverage";
 import { getMembership } from "@/lib/household";
+import { listPendingInboundDrafts } from "@/lib/inbound";
 import { getDaysRemaining } from "@/lib/warranty";
 import { getDashboardCounts, listProductsForUser } from "@/lib/products-query";
 
@@ -30,11 +32,13 @@ export default async function DashboardPage() {
     return null;
   }
 
-  const [{ items: products }, counts, membership] = await Promise.all([
-    listProductsForUser(user.id, { limit: 50 }),
-    getDashboardCounts(user.id),
-    getMembership(user.id),
-  ]);
+  const [{ items: products }, counts, membership, inboundDrafts] =
+    await Promise.all([
+      listProductsForUser(user.id, { limit: 50 }),
+      getDashboardCounts(user.id),
+      getMembership(user.id),
+      listPendingInboundDrafts(user.id),
+    ]);
 
   const expiringProducts = products.filter(
     (product) => getCoverageStatus(product) === "expiring"
@@ -92,6 +96,31 @@ export default async function DashboardPage() {
             </div>
           </div>
         </section>
+
+        {inboundDrafts.length > 0 && (
+          <section className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.06] p-5 md:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <Inbox size={18} className="mt-0.5 text-cyan-300" />
+                <div>
+                  <h2 className="text-base font-semibold text-white">
+                    {inboundDrafts.length} forwarded{" "}
+                    {inboundDrafts.length === 1 ? "invoice" : "invoices"} to review
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Email attachments are drafts until you confirm the dates.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/dashboard/add-product?draft=${inboundDrafts[0]!.id}`}
+                className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black"
+              >
+                Review
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* Stats */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
